@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f2740" />
+    <title>FYI Yachts — Florida Yachts International | Yacht Sales, Charter & Brokerage in Miami</title>
+    <meta name="description" content="Florida Yachts International — Miami yacht brokerage with 300+ years of combined experience. Buy, sell, and charter yachts worldwide." />
+    <!-- Social share card (overridden per-route by the prerender). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FYI Yachts" />
+    <meta property="og:title" content="FYI Yachts — Florida Yachts International | Miami" />
+    <meta property="og:description" content="Miami yacht brokerage with 300+ years of combined experience. Buy, sell, and charter yachts worldwide." />
+    <meta property="og:image" content="https://fyiyachts.com/og-cover.jpg?v=3" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://fyiyachts.com/og-cover.jpg?v=3" />
+    <!-- Favicons, built from the FYI logo by scripts/make-favicons.py. The
+         site had none at all, so browsers showed the default globe. Declared
+         here (not in the prerender's per-route head) because these are
+         site-wide: prerender.mjs reuses this template for all 398 routes and
+         the api/listing shell is generated from the same built index.html.
+         Tab sizes get the "FYI" letters — the full crest, at 16px, is mush;
+         the crest is used where it has the pixels to read, on the home-screen
+         icon. Bump ?v= if the artwork changes: favicons are cached hard. -->
+    <link rel="icon" href="/favicon.ico?v=1" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" href="/favicon-96.png?v=1" sizes="96x96" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=1" />
+    <link rel="preload" href="/fonts/montserrat-var.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preconnect" href="https://images.boatsgroup.com" />
+    <link rel="preconnect" href="https://storage.googleapis.com" />
+  </head>
+  <body class="bg-slate-50 font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <!-- Vercel Speed Insights (field Core Web Vitals). Deferred and inert
+         until Speed Insights is enabled on the Vercel project. -->
+    <script defer src="/_vercel/speed-insights/script.js"></script>
+  </body>
+</html>

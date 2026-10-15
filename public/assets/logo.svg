@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 64" fill="none">
+  <!-- Shield outline -->
+  <path d="M30 2 L56 16 L56 38 C56 50 44 60 30 62 C16 60 4 50 4 38 L4 16 Z" stroke="white" stroke-width="2" fill="none"/>
+  <!-- Yacht hull -->
+  <path d="M30 18 L30 44" stroke="white" stroke-width="2.5"/>
+  <!-- Yacht bridge/cabin -->
+  <rect x="24" y="18" width="12" height="4" rx="1" fill="white"/>
+  <rect x="26" y="14" width="8" height="4" rx="1" fill="white"/>
+  <rect x="28" y="11" width="4" height="3" rx="0.5" fill="white"/>
+  <!-- Hull V-shape -->
+  <path d="M30 44 L20 36 L30 38 Z" fill="white"/>
+  <path d="M30 44 L40 36 L30 38 Z" fill="white"/>
+  <!-- Left wake/waves -->
+  <path d="M18 38 C14 40 10 38 8 42" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M16 42 C12 44 8 42 6 46" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M14 46 C10 48 7 46 5 50" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <!-- Right wake/waves -->
+  <path d="M42 38 C46 40 50 38 52 42" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M44 42 C48 44 52 42 54 46" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M46 46 C50 48 53 46 55 50" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+</svg>

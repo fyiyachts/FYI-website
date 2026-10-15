@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    // utils/img.ts reads images.sizes straight out of vercel.json so the
+    // optimizer's allowed widths cannot drift from the widths we request.
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  // `video/` is a standalone Remotion workspace with its own package.json and
+  // dependencies. It is a tool for producing the hero reel, not part of the
+  // app, and its node_modules are not installed in CI — so type-checking it
+  // here fails the site build on missing `remotion` types.
+  "exclude": ["node_modules", "video"]
+}

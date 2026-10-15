@@ -1,0 +1,99 @@
+/* FYI theme for the scroll-world engine (ported from the Alex G. Clarke site).
+   The engine ships its default tokens inside @layer sw, so this un-layered
+   .sw-root block wins cleanly. Navy page + cream ink to match FYI; per-section
+   accents override at runtime. */
+.sw-root {
+  --sw-bg: #0f2740;
+  --sw-ink: #F0F4F8;
+  --sw-ink-soft: rgba(240, 244, 248, 0.72);
+  --sw-accent: #4CBBC2;
+  --sw-font-display: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --sw-font-body: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+}
+/* Navy during load so the first paint never flashes the cream page background. */
+.sw-mount { background: #0f2740; }
+
+/* Scenes 1 & 2 (Technema 90 at the Faraglioni / running the Capri coast): the
+   yacht sits in the lower half of both photos, and the engine's default crop
+   (center 42%) favours the top — pull the frame down so the yacht rides higher. */
+.sw-stage .sw-scene:nth-child(1) .sw-scene__still { object-position: center 78%; }
+.sw-stage .sw-scene:nth-child(2) .sw-scene__still { object-position: center 74%; }
+
+/* Lift the copy block off the bottom edge on desktop (the engine's default
+   bottom:24px lets the body text kiss the viewport bottom on shorter screens). */
+.sw-root .sw-copy { bottom: clamp(48px, 9vh, 120px); }
+
+/* The Brianna chat pill lives bottom-right — shift the scroll hint left so the
+   two never overlap (desktop and mobile). */
+.sw-root .sw-hint { right: calc(clamp(18px, 5vw, 64px) + 180px); }
+
+/* Slide CTA buttons — FYI pill style: solid brand primary, outline ghost. */
+.sw-root .sw-copy__cta { margin-top: 30px; display: flex; gap: 14px; flex-wrap: wrap; }
+.sw-root .sw-btn--primary,
+.sw-root .sw-btn--ghost {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600; font-size: 13px;
+  letter-spacing: 1.8px; text-transform: uppercase; text-decoration: none;
+  padding: 14px 30px; border-radius: 9999px;
+  transition: background 350ms ease, color 350ms ease, border-color 350ms ease;
+}
+.sw-root .sw-btn--primary {
+  border: 1px solid #cf4537; background: #cf4537; color: #fff;
+}
+.sw-root .sw-btn--primary:hover { background: #ec6f5e; border-color: #ec6f5e; }
+.sw-root .sw-btn--ghost {
+  border: 1px solid rgba(255, 255, 255, 0.7); background: transparent; color: #fff;
+}
+.sw-root .sw-btn--ghost:hover { background: #fff; color: #0f2740; }
+
+/* Route-dot badge. The engine styles this with var(--agc-navy) — a token from
+   the Alex G. Clarke site that does not exist here — so the label fell back to
+   the inherited near-white ink on a translucent white pill and was unreadable.
+   Navy pill, cream ink, teal hairline — the site's own palette, and it reads
+   over both the bright water and the dark hull frames. */
+.sw-root .sw-route__label {
+  color: #F0F4F8;
+  background: rgba(15, 39, 64, 0.92);
+  border-color: rgba(76, 187, 194, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.sw-root .sw-route__dot.is-active .sw-route__label {
+  border-color: #4CBBC2;
+}
+
+/* Parked = the visitor has scrolled past the cinematic into the page content
+   below. Its copy is invisible, so it must not be selectable or clickable
+   either. Targets the elements themselves because they carry their own
+   pointer-events:auto, which an ancestor's `none` cannot override. Removed
+   again on scroll up. */
+.sw-root.sw-parked .sw-copy,
+.sw-root.sw-parked .sw-copy__cta,
+.sw-root.sw-parked .sw-btn--primary,
+.sw-root.sw-parked .sw-btn--ghost,
+.sw-root.sw-parked .sw-route__dot {
+  pointer-events: none !important;
+}
+.sw-root.sw-parked .sw-copylayer,
+.sw-root.sw-parked .sw-topbar,
+.sw-root.sw-parked .sw-route {
+  user-select: none;
+}
+/* With parkFade:false the engine intentionally never fades sky/stage/copylayer
+   out (a hard cut instead of a dissolve) — but they're `position:fixed;
+   inset:0`, so without this they stay fully opaque forever and permanently
+   cover the real page underneath once parked: scrolling keeps working, but
+   every frame looks identical, reading as a frozen page (client, 2026-08-14:
+   "the page freezes"). Hide them the instant they're parked — visibility
+   (not opacity/display) so nothing repaints while hidden, and they reappear
+   immediately on scrolling back up since the class toggles both ways. */
+.sw-root.sw-parked .sw-sky,
+.sw-root.sw-parked .sw-stage,
+.sw-root.sw-parked .sw-copylayer,
+.sw-root.sw-parked .sw-topbar,
+.sw-root.sw-parked .sw-route,
+.sw-root.sw-parked .sw-scrollbar {
+  visibility: hidden;
+}

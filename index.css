@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/* Self-hosted Montserrat (variable, latin subset) — replaces the
+   render-blocking Google Fonts stylesheet. Two ~35KB/17KB files served
+   same-origin with immutable caching (vercel.json). */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/montserrat-var.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/montserrat-var-italic.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  --color-yacht-900: #0f2740;
+  --color-yacht-800: #11142a;
+  --color-yacht-700: #072748;
+  --color-yacht-brand: #cf4537;
+  --color-yacht-brand-light: #ec6f5e;
+  --color-yacht-cream: #F0F4F8;
+  --color-yacht-teal: #4CBBC2;
+  /* Gold accent, used for the "Create Yacht Profile" CTA on listings. */
+  --color-yacht-gold: #E3C05F;
+  --color-yacht-gold-dark: #D0AB45;
+  --font-serif: 'Montserrat', system-ui, sans-serif;
+  --font-sans: 'Montserrat', system-ui, sans-serif;
+  /* Page containers (mx-auto max-w-7xl, used site-wide) read this token —
+     widened from Tailwind's default 80rem/1280px (client, 2026-08-13:
+     "container max width should be at least 1440px"). */
+  --container-7xl: 1440px;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out;
+}
+
+/* Homepage concept (/homepage): slow hero zoom + brand marquee. */
+@keyframes kenburns {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+}
+
+.animate-kenburns {
+  animation: kenburns 20s ease-out forwards;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 45s linear infinite;
+}
+
+/* Water texture for the pale editorial bands (client, 2026-08-21: "can we add
+   some texture, like water or something else? It needs something; it's plain").
+
+   Drawn entirely in CSS rather than with a photograph: this sits behind body
+   copy, so it has to stay quiet enough to read through, and a background image
+   here would cost a request and a few hundred KB on the homepage's critical
+   path to do it worse.
+
+   Three stacked layers make it read as water instead of as a pattern swatch:
+   a fine chop, a slower broad swell at a different angle and period so the two
+   never resolve into a grid, and a soft bloom at the top like sun on a surface.
+   The drift is 48s and travels ~1.5% — it should register as "alive" at the
+   edge of vision, never as movement you can follow while reading.
+
+   Apply to a section that sets its own background; the class handles the rest. */
+.water-texture {
+  position: relative;
+  isolation: isolate;
+}
+
+.water-texture > * {
+  position: relative;
+  z-index: 1;
+}
+
+.water-texture::before {
+  content: '';
+  position: absolute;
+  /* Overhangs the box so the drift never exposes an untextured edge. */
+  inset: 0 -4%;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    /* Sun on the surface, top-centre. */
+    radial-gradient(120% 70% at 50% -15%, rgba(255, 255, 255, 0.95), transparent 60%),
+    /* Caustic pools — offset and unequal so the eye reads depth, not tiling. */
+    radial-gradient(56% 34% at 17% 28%, rgba(76, 187, 194, 0.10), transparent 70%),
+    radial-gradient(48% 28% at 79% 63%, rgba(76, 187, 194, 0.08), transparent 72%),
+    radial-gradient(42% 26% at 63% 10%, rgba(255, 255, 255, 0.55), transparent 70%),
+    /* Fine surface ripple. Near-HORIZONTAL is what sells water — the first pass
+       at this used near-vertical bands and read as screen banding, not sea. */
+    repeating-linear-gradient(
+      178deg,
+      rgba(15, 39, 64, 0.032) 0 1px,
+      transparent 1px 9px
+    ),
+    /* Slower swell underneath, at a hair's different angle so the two never
+       phase-lock into a visible grid. */
+    repeating-linear-gradient(
+      182.5deg,
+      rgba(15, 39, 64, 0.024) 0 2px,
+      transparent 2px 27px
+    );
+  /* Fade the pattern out at the band's edges so it never hard-cuts against the
+     neighbouring section. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  animation: water-drift 48s ease-in-out infinite alternate;
+}
+
+/* Drifts vertically by one ripple period, so the swell reads as passing under
+   you rather than sliding sideways across the page. */
+@keyframes water-drift {
+  from { transform: translate3d(0, -9px, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .water-texture::before { animation: none; }
+}
+
+/* When a sticky mobile CTA bar is on screen (components/public/StickyCta.tsx
+   or the listing pages' StickyMobileCta), lift the Brianna launcher and its
+   open panel above it so the two don't overlap. Scoped below `lg` because the
+   bar itself is `lg:hidden`. The flag is set by useStickyCtaFlag. */
+@media (max-width: 1023px) {
+  .has-sticky-cta .brianna-launcher {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+  .has-sticky-cta .brianna-panel {
+    bottom: calc(10rem + env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 13rem);
+  }
+}
