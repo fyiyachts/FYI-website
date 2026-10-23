@@ -403,9 +403,11 @@ export default function PublicListingPage() {
         {/* Right: identity sidebar */}
         <aside id="inquire" className="scroll-mt-24 lg:sticky lg:top-24 lg:self-start">
           <div className="border border-yacht-900/10 bg-white p-7">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-yacht-brand">
-              {boat.listingType === 'cobrokerage' ? 'Co-Brokerage · Available through FYI' : 'FYI Exclusive'}
-            </p>
+            {boat.listingType !== 'cobrokerage' && (
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-yacht-brand">
+                FYI Exclusive
+              </p>
+            )}
             <h1 className="font-serif text-3xl italic leading-snug text-yacht-900">{displayModel}</h1>
             <p className="mt-2 text-[13px] font-light tracking-wide text-yacht-900/55">
               {[boat.make ? boat.make.toUpperCase() : null, metric].filter(Boolean).join(' · ')}

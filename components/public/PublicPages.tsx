@@ -158,7 +158,7 @@ function BoatCard({ boat }: { boat: PublicBoat }) {
   // detail page falls back to the enquiry form, vessel pre-filled.
   // Co-brokerage boats (BoatsGroup PLS) have full /listing/:id pages too.
   const external = boat.source && boat.source !== 'fyi' && boat.source !== 'cobrokerage';
-  const badge = boat.source === 'cobrokerage' ? 'Co-Brokerage' : boat.source === 'fyi' ? 'FYI Exclusive' : null;
+  const badge = boat.source === 'fyi' ? 'FYI Exclusive' : null;
   const href = boat.externalUrl
     ?? (external
       ? `/contact?vessel=${encodeURIComponent([boat.year, boat.make, boat.model].filter(Boolean).join(' '))}`
