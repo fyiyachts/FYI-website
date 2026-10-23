@@ -8,6 +8,7 @@ type VercelResponse = {
 };
 
 import { findManualListing, manualListingsFor } from '../_lib/manualListings.js';
+import { plsConfigured, plsGetById } from '../_lib/plsFeed.js';
 
 // BoatsGroup (boats.com) inventory feed. Key is a query param (no auth header).
 // Set BOATS_API_KEY to FYI's own BoatsGroup inventory key.
@@ -202,6 +203,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let body = await upstream.text();
+
+    // Not one of FYI's boats? It may be a co-brokerage listing (BoatsGroup
+    // PLS). FYI's own version always wins: PLS is only asked when the
+    // exclusives feed has no such DocumentID.
+    if (targetsListing && upstream.ok && plsConfigured()) {
+      let found = true;
+      try { found = (JSON.parse(body)?.numResults ?? 0) > 0; } catch { /* keep upstream body */ }
+      if (!found) {
+        const id = url.searchParams.get('documentid') || url.searchParams.get('id') || '';
+        const co = await plsGetById(id).catch(() => undefined);
+        if (co) body = JSON.stringify({ numResults: 1, results: [co] });
+      }
+    }
     // Fold the hand-entered listings into active-inventory results, ahead of
     // the feed rows. Only on a clean JSON 200 — an error body passes through.
     const extra = upstream.ok && !targetsListing ? manualListingsFor(url.searchParams) : [];

@@ -9,7 +9,7 @@
  * Where a listing came from. Inventory is presented in this order everywhere:
  * FYI's own boats first, then the wider BoatsGroup marketplace.
  */
-export type BoatSource = 'fyi' | 'boatsgroup';
+export type BoatSource = 'fyi' | 'cobrokerage' | 'boatsgroup';
 
 export interface PublicBoat {
   id: string;
@@ -136,28 +136,32 @@ export function normalizePublicBoat(it: Record<string, any>): PublicBoat | null 
     image: images[0] ? resizeBG(images[0], 900, 675) : undefined,
     company: it.CompanyName || undefined,
     rep: (it.SalesRep && it.SalesRep.Name) ? String(it.SalesRep.Name).trim() : undefined,
-    source: isFyiCompany(it.CompanyName) ? 'fyi' : 'boatsgroup',
+    source: it.ListingType === 'cobrokerage' ? 'cobrokerage' : isFyiCompany(it.CompanyName) ? 'fyi' : 'boatsgroup',
     soldDate: it.SoldDate ? String(it.SoldDate) : undefined,
   };
 }
 
 /**
- * Wider BoatsGroup marketplace, excluding FYI's own boats. The key behind
- * `/api/yachts/proxy` is currently scoped to FYI's own book, so this returns
- * nothing today; a broader entitlement on `BOATS_API_KEY` lights it up with no
- * change here.
+ * Co-brokerage listings (BoatsGroup PLS, via /api/yachts/cobrokerage): boats
+ * listed by other brokerages that FYI can sell. FYI's own boats are in that
+ * feed too, so anything already in FYI's exclusives is dropped here and only
+ * ever shows as an FYI Exclusive.
  */
-export async function fetchWorldwideBoatsGroup(make?: string): Promise<PublicBoat[]> {
-  const qs = new URLSearchParams({ rows: '200' });
+export async function fetchWorldwideBoatsGroup(make?: string, rows = 200): Promise<PublicBoat[]> {
+  const qs = new URLSearchParams({ rows: String(rows) });
   if (make) qs.set('make', make);
   try {
-    const res = await fetch(`/api/yachts/proxy?${qs.toString()}`, { credentials: 'same-origin' });
+    const [res, own] = await Promise.all([
+      fetch(`/api/yachts/cobrokerage?${qs.toString()}`, { credentials: 'same-origin' }),
+      fetchActiveInventory().catch(() => [] as PublicBoat[]),
+    ]);
     if (!res.ok) return [];
     const data = await res.json().catch(() => ({}));
     const items: any[] = Array.isArray(data?.results) ? data.results : [];
+    const ownIds = new Set(own.map(b => b.id));
     return items
       .map(normalizePublicBoat)
-      .filter((b): b is PublicBoat => b !== null && !isFyiCompany(b.company));
+      .filter((b): b is PublicBoat => b !== null && !ownIds.has(b.id) && !isFyiCompany(b.company));
   } catch {
     return [];
   }

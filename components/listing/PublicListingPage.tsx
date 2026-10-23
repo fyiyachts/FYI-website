@@ -22,6 +22,8 @@ import { track } from '../../utils/analytics';
 // stay; the serif accents mirror the template's headings.
 
 interface Boat {
+  /** 'cobrokerage' for BoatsGroup PLS listings; FYI's own boats leave it unset. */
+  listingType?: string;
   id: string;
   title: string;
   boatName?: string;
@@ -89,6 +91,7 @@ function normalize(it: any): Boat {
   const title = it.BoatName || [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ').trim() || 'Yacht';
   return {
     id: String(it.DocumentID || ''),
+    listingType: it.ListingType || undefined,
     title,
     boatName: it.BoatName || undefined,
     price: it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price),
@@ -400,6 +403,9 @@ export default function PublicListingPage() {
         {/* Right: identity sidebar */}
         <aside id="inquire" className="scroll-mt-24 lg:sticky lg:top-24 lg:self-start">
           <div className="border border-yacht-900/10 bg-white p-7">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-yacht-brand">
+              {boat.listingType === 'cobrokerage' ? 'Co-Brokerage · Available through FYI' : 'FYI Exclusive'}
+            </p>
             <h1 className="font-serif text-3xl italic leading-snug text-yacht-900">{displayModel}</h1>
             <p className="mt-2 text-[13px] font-light tracking-wide text-yacht-900/55">
               {[boat.make ? boat.make.toUpperCase() : null, metric].filter(Boolean).join(' · ')}

@@ -8,6 +8,7 @@
 // what the client renders.
 import { INDEX_SHELL } from './_lib/indexShell.js';
 import { findManualListing } from './_lib/manualListings.js';
+import { plsGetById } from './_lib/plsFeed.js';
 
 type VercelRequest = { query: Record<string, string | string[]>; method?: string };
 type VercelResponse = {
@@ -78,6 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const feed = (await fetch(url).then((r) => r.json())) as { results?: Record<string, any>[] };
       it = feed.results?.[0];
     }
+    // Co-brokerage boats (BoatsGroup PLS) get the same server-rendered page.
+    if (!it) it = await plsGetById(id).catch(() => undefined);
     if (!it) return notFound(res);
 
     const loc = it.BoatLocation || {};

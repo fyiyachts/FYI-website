@@ -156,7 +156,9 @@ export function ImagePageHero({
 function BoatCard({ boat }: { boat: PublicBoat }) {
   // Only FYI's own boats have a /listing/:id page. Anything external with no
   // detail page falls back to the enquiry form, vessel pre-filled.
-  const external = boat.source && boat.source !== 'fyi';
+  // Co-brokerage boats (BoatsGroup PLS) have full /listing/:id pages too.
+  const external = boat.source && boat.source !== 'fyi' && boat.source !== 'cobrokerage';
+  const badge = boat.source === 'cobrokerage' ? 'Co-Brokerage' : boat.source === 'fyi' ? 'FYI Exclusive' : null;
   const href = boat.externalUrl
     ?? (external
       ? `/contact?vessel=${encodeURIComponent([boat.year, boat.make, boat.model].filter(Boolean).join(' '))}`
@@ -178,6 +180,11 @@ function BoatCard({ boat }: { boat: PublicBoat }) {
           ) : (
             <div className="flex h-full items-center justify-center"><Anchor className="h-8 w-8 text-yacht-900/20" /></div>
           )}
+          {badge ? (
+            <span className={`absolute bottom-3 left-4 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] backdrop-blur-sm ${boat.source === 'fyi' ? 'bg-yacht-brand text-white' : 'bg-white/90 text-yacht-900'}`}>
+              {badge}
+            </span>
+          ) : null}
           {boat.lengthFt ? (
             <span className="absolute left-4 top-4 bg-yacht-900/85 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-yacht-cream backdrop-blur-sm">
               {Math.round(boat.lengthFt)}&#39;
