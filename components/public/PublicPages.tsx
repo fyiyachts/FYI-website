@@ -22,7 +22,7 @@ import { WishlistHeart } from './Wishlist';
 import { getBrandDetail } from './brandContent';
 import { SellScrollHero } from './scrollWorld/SellScrollHero';
 import {
-  BRAND_PAGES, CATEGORY_PAGES, brandSeoTitle, brandSeoDescription,
+  BRAND_PAGES, CATEGORY_PAGES, brandMake, brandSeoTitle, brandSeoDescription,
   fetchActiveInventory, searchCobrokerage,
   fmtUsd, normalizePublicBoat,
   compareSold, soldWindowStart,
@@ -1176,7 +1176,7 @@ const BROWSE_SIZES: [string, string][] = [['0-40', "Under 40'"], ['40-60', "40â€
 const BROWSE_YEARS: [string, string][] = [['2010', '2010 & newer'], ['2015', '2015 & newer'], ['2020', '2020 & newer']];
 
 function BrandBrowse({ brand }: { brand: BrandPage }) {
-  const base = `/yachts-for-sale?make=${encodeURIComponent(brand.name)}`;
+  const base = `/yachts-for-sale?make=${encodeURIComponent(brandMake(brand))}`;
   const chip = 'rounded-full border border-yacht-900/15 bg-white px-4 py-2 text-[13px] font-medium text-yacht-900/80 transition-colors hover:border-yacht-brand hover:text-yacht-brand';
   return (
     <section className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
@@ -1214,7 +1214,7 @@ function BrandModels({ brand, models }: { brand: BrandPage; models: { name: stri
           {models.map(m => (
             <Link
               key={m.name}
-              to={`/yachts-for-sale?make=${encodeURIComponent(brand.name)}`}
+              to={`/yachts-for-sale?make=${encodeURIComponent(brandMake(brand))}`}
               className="group flex flex-col justify-between gap-3 bg-yacht-900 p-6 transition-colors hover:bg-yacht-800"
             >
               <div>
@@ -1342,7 +1342,7 @@ function BrandMarqueImage({ brand }: { brand: BrandPage }) {
     if (own) return;
     let alive = true;
     (async () => {
-      const bg = await searchCobrokerage({ make: brand.name, sort: 'price-desc' })
+      const bg = await searchCobrokerage({ make: brandMake(brand), sort: 'price-desc' })
         .then(page => page.boats)
         .catch(() => [] as PublicBoat[]);
       if (alive) setFallback(pickFlagship(bg, brand.match));
@@ -1462,7 +1462,7 @@ export function BrandInventoryPage({ brand }: { brand: BrandPage }) {
       <div id="inventory" className="scroll-mt-24" />
       {/* One search: FYI's own boats of this brand first, then co-brokerage. */}
       <TieredInventory
-        make={brand.name}
+        make={brandMake(brand)}
         filter={filter}
         emptyNote={`No ${brand.name} is listed with us at this moment â€” but as brokers with direct brand relationships we can source your ${brand.name} on or off market.`}
       />

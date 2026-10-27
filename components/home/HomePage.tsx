@@ -28,7 +28,7 @@ import { identifyVisitor } from '../../utils/hubspotTracking';
 import { VOICE_SEARCH_ENABLED, SPANISH_ENABLED } from '../../utils/featureFlags';
 import { languageToggleTarget } from '../es/esRoutes';
 import { FYI_TEAM, repKey } from '../team/fyiTeam';
-import { BRAND_PAGES, CATEGORY_PAGES, soldWindowStart, withinSoldWindow } from '../public/publicData';
+import { BRAND_PAGES, CATEGORY_PAGES, brandMake, soldWindowStart, withinSoldWindow } from '../public/publicData';
 import { CHARTER_FLEET, CHARTER_FROM_PRICE, fromRate } from '../public/charterFleet';
 import { TESTIMONIALS } from '../public/testimonials';
 import { FaqSection } from '../public/Faq';
@@ -1147,7 +1147,9 @@ function parseHeroQuery(raw: string): URLSearchParams {
 
   // Brand — match any known builder name in the query.
   const brand = BRAND_PAGES.find((b) => q.includes(b.match));
-  if (brand) p.set('make', brand.name);
+  // The feed's spelling of the builder ("Cigarette", not the page's "Cigarette
+  // Racing"), so the make filter matches in both FYI's book and co-brokerage.
+  if (brand) p.set('make', brandMake(brand));
 
   // Boat type → the classCode substrings applyFilters matches on.
   const TYPES: [RegExp, string][] = [

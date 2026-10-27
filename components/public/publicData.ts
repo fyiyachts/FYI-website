@@ -240,6 +240,15 @@ export interface BrandPage {
   seoDescription?: string;
 }
 
+/**
+ * The builder as the feeds name it, for make filters: "Ferretti" (feeds say
+ * "Ferretti Yachts"), "Cigarette" (the page says "Cigarette Racing"). Built
+ * from `match` rather than `name`, which is display copy and can carry words
+ * the feed's MakeString doesn't — PLS then matches nothing.
+ */
+export const brandMake = (b: BrandPage): string =>
+  b.match.replace(/\b[a-z]/g, c => c.toUpperCase());
+
 /** Search-result title for a brand page — the per-brand override, else the generic pattern. */
 export const brandSeoTitle = (b: BrandPage): string =>
   // "Ferretti Yachts" must not become "Ferretti Yachts Yachts for Sale" — a

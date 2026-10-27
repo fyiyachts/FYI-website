@@ -85,6 +85,16 @@ async function ownIds(): Promise<Set<string>> {
 
 /* ------------------------------------------------ free-text → make */
 
+/**
+ * PLS matches `make` word by word, OR'd: make=Ferretti Yachts returns every
+ * make containing "Yachts" (757 boats, against 42 Ferretti). A quoted phrase
+ * matches exactly ("Ferretti Yachts" → 42), so multi-word makes are quoted.
+ */
+const plsMake = (make: string): string => {
+  const m = make.replace(/"/g, '').trim();
+  return /\s/.test(m) ? `"${m}"` : m;
+};
+
 // Words that are never a builder, so they are not worth a probe.
 const STOPWORDS = new Set([
   'yacht', 'yachts', 'boat', 'boats', 'for', 'sale', 'the', 'and', 'with', 'new', 'used',
@@ -99,7 +109,7 @@ async function isMake(candidate: string): Promise<boolean> {
   const known = makeProbe.get(key);
   if (known !== undefined) return known;
   try {
-    const { numResults } = await plsSearch({ make: candidate, rows: '0' }, { fields: 'DocumentID' });
+    const { numResults } = await plsSearch({ make: plsMake(candidate), rows: '0' }, { fields: 'DocumentID' });
     const hit = numResults > 0;
     if (makeProbe.size > 2_000) makeProbe.clear();
     makeProbe.set(key, hit);
@@ -119,8 +129,9 @@ async function splitQuery(q: string): Promise<{ make?: string; keyword: string }
   const words = q.trim().split(/\s+/).filter(Boolean);
   const candidates: { text: string; at: number; len: number }[] = [];
   for (let i = 0; i + 1 < words.length; i++) {
-    const pair = `${words[i]} ${words[i + 1]}`;
-    if (/[a-z]/i.test(pair)) candidates.push({ text: pair, at: i, len: 2 });
+    if (/^[a-z]/i.test(words[i]) && /^[a-z]/i.test(words[i + 1])) {
+      candidates.push({ text: `${words[i]} ${words[i + 1]}`, at: i, len: 2 });
+    }
   }
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
@@ -167,7 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     make = split.make ?? '';
     keyword = split.keyword;
   }
-  if (make) pls.make = make;
+  if (make) pls.make = plsMake(make);
   if (keyword) pls.keyword = keyword;
 
   if (p.type) pls.class = CLASS_ALIASES[p.type.toLowerCase()] ?? p.type;
