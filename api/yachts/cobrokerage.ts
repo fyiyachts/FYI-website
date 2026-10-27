@@ -7,6 +7,7 @@
 //   length=48:52|feet  price=500000:1000000|USD  year=2020:2100  (min:max —
 //   "48-52" style ranges error or are ignored), class=Motor Yachts,
 //   condition=New|Used, sort=Price|desc, rows+start for paging.
+//   The default is sort=Length|desc (longest first, the site-wide order).
 //   "Newest" is sort=ItemReceivedDate|desc (date first listed);
 //   LastModificationDate orders by last edit instead, so it is not used.
 //
@@ -166,7 +167,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const pls: Record<string, string | undefined> = {
     rows: String(rows),
     start: String(start),
-    sort: SORTS[p.sort] ?? SORTS.newest,
+    // Default: longest first, the site-wide inventory order.
+    sort: SORTS[p.sort] ?? SORTS['length-desc'],
     state: p.state || undefined,
     country: p.country || undefined,
   };

@@ -215,6 +215,9 @@ function BoatCard({ boat, priority = false }: { boat: PublicBoat; priority?: boo
 // One sort for both tiers; /api/yachts/cobrokerage maps the same keys to PLS.
 type SortKey = 'newest' | 'price-desc' | 'price-asc' | 'length-desc';
 const SORT_KEYS: SortKey[] = ['newest', 'price-desc', 'price-asc', 'length-desc'];
+// Longest first everywhere boats are listed (client, 2026-10-27); boats with
+// no length sort to the end of their group. Not written to the URL.
+const DEFAULT_SORT: SortKey = 'length-desc';
 const PAGE_SIZE = 24;
 
 function useInventory(filter: (b: PublicBoat) => boolean) {
@@ -619,7 +622,8 @@ function sortBoats(boats: PublicBoat[], sort: SortKey): PublicBoat[] {
   switch (sort) {
     case 'price-asc': arr.sort((a, b) => (v(a.priceUsd) === -1 ? 1 : v(b.priceUsd) === -1 ? -1 : v(a.priceUsd) - v(b.priceUsd))); break;
     case 'price-desc': arr.sort((a, b) => v(b.priceUsd) - v(a.priceUsd)); break;
-    case 'length-desc': arr.sort((a, b) => v(b.lengthFt) - v(a.lengthFt)); break;
+    // A missing or zero length counts as unknown and goes last.
+    case 'length-desc': arr.sort((a, b) => v(b.lengthFt || undefined) - v(a.lengthFt || undefined)); break;
     default: arr.sort((a, b) => ts(b.listedAt) - ts(a.listedAt));
   }
   return arr;
@@ -664,13 +668,13 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
   const { loading, boats } = useInventory(filter);
   const [params, setParams] = useSearchParams();
   const filters: Filters = useMemo(() => readFilters(params), [params]);
-  const sort: SortKey = SORT_KEYS.includes(params.get('sort') as SortKey) ? (params.get('sort') as SortKey) : 'newest';
+  const sort: SortKey = SORT_KEYS.includes(params.get('sort') as SortKey) ? (params.get('sort') as SortKey) : DEFAULT_SORT;
   const writeParams = (f: Filters, s: SortKey) => {
     // Only the canonical min/max keys are written back, so a URL that arrived
     // with a legacy bucket param is rewritten in the new shape on first edit.
     const next = new URLSearchParams();
     for (const [k, v] of Object.entries(f)) if (v) next.set(k, v);
-    if (s !== 'newest') next.set('sort', s);
+    if (s !== DEFAULT_SORT) next.set('sort', s);
     setParams(next, { replace: true });
   };
   const setFilters = (f: Filters) => writeParams(f, sort);
@@ -762,10 +766,10 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
             onChange={e => writeParams(filters, e.target.value as SortKey)}
             className="rounded-lg border border-yacht-900/20 bg-white px-3 py-2 text-[13px] text-yacht-900 focus:border-yacht-brand focus:outline-none"
           >
+            <option value="length-desc">Length: longest first</option>
             <option value="newest">Newest first</option>
             <option value="price-desc">Price: high to low</option>
             <option value="price-asc">Price: low to high</option>
-            <option value="length-desc">Length: longest first</option>
           </select>
         </label>
       </div>
