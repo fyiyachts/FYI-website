@@ -400,7 +400,6 @@ export default function PublicListingPage() {
             this information nor warrant the condition of the vessel. A buyer should instruct his agents, or his surveyors,
             to investigate such details as the buyer desires validated. This vessel is offered subject to prior sale,
             price change or withdrawal without notice.
-            {boat.listingType === 'cobrokerage' && boat.courtesy && <> {boat.courtesy}</>}
           </p>
         </div>
 
@@ -420,6 +419,10 @@ export default function PublicListingPage() {
             <p className="mt-5 border-t border-yacht-900/10 pt-5 text-[14px] font-light text-yacht-900/60">
               Asking Price: <span className="text-xl font-semibold tracking-wide text-yacht-900">{usd(boat.price)}</span>
             </p>
+            {/* PLS courtesy line ("…centrally listed by …"): its own line by the price so it is seen at first glance. */}
+            {boat.listingType === 'cobrokerage' && boat.courtesy && (
+              <p className="mt-3 text-[12px] font-light leading-5 text-yacht-900/60">{boat.courtesy}</p>
+            )}
 
             <button
               type="button"
