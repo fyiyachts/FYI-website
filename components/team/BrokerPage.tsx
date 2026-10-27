@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Anchor, ArrowLeft, Languages, Mail, Phone } from 'lucide-react';
-import { memberBySlug } from './fyiTeam';
+import { memberBySlug, telHref } from './fyiTeam';
 import { BrokerAvatar } from './TeamPage';
 
 const GOLD = '#D4AF37';
@@ -115,10 +115,10 @@ export default function BrokerPage() {
             </p>
           </div>
           <div className="flex flex-none flex-col gap-2 text-[13px]">
-            <a href="tel:+13058546020" className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
-              <Phone className="h-4 w-4" style={{ color: GOLD }} /> (305) 854-6020
+            <a href={member.phone ? telHref(member.phone) : 'tel:+13058546020'} className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
+              <Phone className="h-4 w-4" style={{ color: GOLD }} /> {member.phone ?? '(305) 854-6020'}
             </a>
-            <a href={`mailto:sales@fyiyachts.com?subject=${encodeURIComponent(`Inquiry for ${member.name}`)}`} className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
+            <a href={`mailto:${member.email ?? 'sales@fyiyachts.com'}?subject=${encodeURIComponent(`Inquiry for ${member.name}`)}`} className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
               <Mail className="h-4 w-4" style={{ color: GOLD }} /> Contact {member.name.split(' ')[0]}
             </a>
           </div>

@@ -44,6 +44,10 @@ export interface TeamMember {
    * Set it only from a figure FYI has given you.
    */
   additionalPrivateSales?: number;
+  /** Direct inbox; profile pages show it instead of sales@fyiyachts.com when set. */
+  email?: string;
+  /** Direct line, display form; profile pages show it instead of the office number when set. */
+  phone?: string;
 }
 
 /**
@@ -217,7 +221,20 @@ export const FYI_TEAM: TeamMember[] = [
     languages: ['English', 'Spanish'],
     photo: '/team/roman-joa.webp',
   },
+  {
+    slug: 'dante-de-rosa',
+    name: 'Dante De Rosa',
+    title: 'Yacht Consultant Assistant',
+    region: 'Florida',
+    languages: ['English'],
+    photo: '/team/dante-de-rosa.webp',
+    email: 'dante@fyiyachts.com',
+    phone: '+1 (305) 799-7008',
+  },
 ];
+
+/** tel: href for a display-form phone number ("+1 (305) 799-7008" → "tel:+13057997008"). */
+export const telHref = (phone: string): string => `tel:${phone.replace(/[^\d+]/g, '')}`;
 
 // Same loose key the API uses, so roster names match feed SalesRep names
 // despite spelling drift ("Concepcion" vs "Conception").

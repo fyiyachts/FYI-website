@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Anchor, ArrowRight, Globe2, Languages, MapPin, Phone } from 'lucide-react';
+import { Anchor, ArrowRight, Globe2, Languages, Mail, MapPin, Phone } from 'lucide-react';
 import { HomeNav, HomeFooter } from '../home/HomePage';
 import BriannaWidget from '../chat/BriannaWidget';
-import { FYI_TEAM, memberBySlug, repKey, type TeamMember } from '../team/fyiTeam';
+import { FYI_TEAM, memberBySlug, repKey, telHref, type TeamMember } from '../team/fyiTeam';
 import { FYI_BIOS } from '../team/fyiBios';
 import { usePageMeta } from '../../utils/usePageMeta';
 import { PublicInquiryForm } from './PublicPages';
@@ -232,9 +232,14 @@ export function ConsultantPage() {
               <a href="#contact-broker" className="bg-yacht-brand px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-white transition-colors hover:bg-yacht-brand-light">
                 Work with {firstName(member)}
               </a>
-              <a href="tel:+13058546020" className="flex items-center gap-2 border border-white/30 px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-white transition-colors hover:border-yacht-brand">
-                <Phone className="h-4 w-4" /> 305-854-6020
+              <a href={member.phone ? telHref(member.phone) : 'tel:+13058546020'} className="flex items-center gap-2 border border-white/30 px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-white transition-colors hover:border-yacht-brand">
+                <Phone className="h-4 w-4" /> {member.phone ?? '305-854-6020'}
               </a>
+              {member.email && (
+                <a href={`mailto:${member.email}`} className="flex items-center gap-2 border border-white/30 px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-white transition-colors hover:border-yacht-brand">
+                  <Mail className="h-4 w-4" /> {member.email}
+                </a>
+              )}
             </div>
           </div>
         </div>
