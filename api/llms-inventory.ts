@@ -31,6 +31,14 @@ const num = (v: unknown): number | undefined => {
 
 const clean = (v: unknown): string => String(v ?? '').replace(/\s+/g, ' ').trim();
 
+// Abroad, the feed gives only a two-letter country code, and "Budva, ME"
+// reads as Maine, not Montenegro. Spell countries out; US states stay codes.
+const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+const country = (code: string): string => {
+  if (!/^[A-Z]{2}$/i.test(code)) return code;
+  try { return regionNames.of(code.toUpperCase()) || code; } catch { return code; }
+};
+
 /** "{Year} {Make} {Model}" — same rule as the site's cards (utils/boatTitle.ts). */
 function title(it: Record<string, any>): string {
   const make = clean(it.MakeString);
@@ -47,7 +55,7 @@ function line(it: Record<string, any>): { len: number; text: string } {
   const name = clean(it.BoatName);
   const t = title(it);
   const city = loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? clean(loc.BoatCityName) : '';
-  const where = [city, clean(loc.BoatStateCode) || clean(loc.BoatCountryID)].filter(Boolean).join(', ');
+  const where = [city, clean(loc.BoatStateCode) || country(clean(loc.BoatCountryID))].filter(Boolean).join(', ');
   const parts = [
     `- ${t}${name && !t.toLowerCase().includes(name.toLowerCase()) ? `, "${name}"` : ''}`,
     lengthFt ? `${Math.round(lengthFt)} ft` : 'Length on request',
