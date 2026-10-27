@@ -53,7 +53,6 @@ interface Boat {
   waterCap?: string;
   holdingCap?: string;
   location?: string;
-  rep?: string;
   images: string[];
   description?: string;
   /** PLS courtesy line for co-brokerage boats ("…centrally listed by Yachts360."). */
@@ -123,7 +122,6 @@ function normalize(it: any): Boat {
     holdingCap: cap(it.HoldingTankCapacityMeasure),
     location: [loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : null, loc.BoatStateCode || loc.BoatCountryID]
       .filter(Boolean).join(', ') || undefined,
-    rep: (it.SalesRep && it.SalesRep.Name) ? String(it.SalesRep.Name).trim() : undefined,
     images: images.slice(0, 30),
     description: typeof it.GeneralBoatDescription === 'string' ? stripHtml(it.GeneralBoatDescription) : undefined,
     courtesy: typeof it.PlsDisclaimer === 'string' ? stripHtml(it.PlsDisclaimer) || undefined : undefined,
@@ -153,9 +151,11 @@ function EnquireModal({ boat, onClose }: { boat: Boat; onClose: () => void }) {
         </button>
         <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-yacht-teal">Private Inquiry</p>
         <h3 className="mt-2 font-serif text-2xl italic text-yacht-900">{boat.title}</h3>
-        {boat.rep && (
+        {/* FYI Exclusives are listed by the brokerage, never a named broker
+            (client, 2026-10-27). Co-brokerage boats show no line at all. */}
+        {boat.listingType !== 'cobrokerage' && (
           <p className="mt-2 text-[13px] font-light text-yacht-900/60">
-            Listed by <span className="font-semibold text-yacht-900">{boat.rep}</span>
+            Listed by <span className="font-semibold text-yacht-900">FYI Yachts</span>
           </p>
         )}
         <div className="mt-5">
@@ -441,9 +441,10 @@ export default function PublicListingPage() {
             <ContactButtons context={boat.title} />
             {/* A gold "Create Yacht Profile" pairs with the wishlist here. */}
             <CreateYachtProfileCta id={String(boat.id)} name={boat.title} />
-            {boat.rep && (
+            {/* FYI Exclusives: the brokerage, never a named broker (client, 2026-10-27). */}
+            {boat.listingType !== 'cobrokerage' && (
               <p className="mt-5 border-t border-yacht-900/10 pt-4 text-[13px] font-light text-yacht-900/60">
-                Listed by <span className="font-semibold text-yacht-900">{boat.rep}</span>
+                Listed by <span className="font-semibold text-yacht-900">FYI Yachts</span>
               </p>
             )}
           </div>
