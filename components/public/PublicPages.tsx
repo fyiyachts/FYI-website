@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Anchor, ArrowRight, Bitcoin, Camera, FileCheck2, Globe2, Handshake, MapPin, Megaphone, Phone, Search, Ship, Sparkles, TrendingUp, Users } from 'lucide-react';
 import { HomeNav, HomeFooter } from '../home/HomePage';
@@ -23,7 +23,7 @@ import { getBrandDetail } from './brandContent';
 import { SellScrollHero } from './scrollWorld/SellScrollHero';
 import {
   BRAND_PAGES, CATEGORY_PAGES, brandSeoTitle, brandSeoDescription,
-  fetchActiveInventory, fetchWorldwideBoatsGroup,
+  fetchActiveInventory, searchCobrokerage,
   fmtUsd, normalizePublicBoat,
   compareSold, soldWindowStart,
   type BrandPage, type CategoryPage, type PublicBoat,
@@ -208,7 +208,10 @@ function BoatCard({ boat }: { boat: PublicBoat }) {
   );
 }
 
-type SortKey = 'price-desc' | 'price-asc' | 'length-desc' | 'year-desc';
+// One sort for both tiers; /api/yachts/cobrokerage maps the same keys to PLS.
+type SortKey = 'newest' | 'price-desc' | 'price-asc' | 'length-desc';
+const SORT_KEYS: SortKey[] = ['newest', 'price-desc', 'price-asc', 'length-desc'];
+const PAGE_SIZE = 24;
 
 function useInventory(filter: (b: PublicBoat) => boolean) {
   const [boats, setBoats] = useState<PublicBoat[] | null>(null);
@@ -279,9 +282,13 @@ function applyFilters(boats: PublicBoat[], f: Filters): PublicBoat[] {
   const minPrice = numOr(f.minPrice, -Infinity);
   const maxPrice = numOr(f.maxPrice, Infinity);
   const minYear = f.year ? parseInt(f.year, 10) : 0;
-  const q = f.q.trim().toLowerCase();
+  // Free text is matched word by word, each at a word start: "50 Azimut"
+  // finds the Azimut Atlantis 50. That is the co-brokerage search's split
+  // (builder → make, the rest → keyword) applied to FYI's own boats.
+  const words = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    .map(w => new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   return boats.filter(b =>
-    (!q || `${b.title} ${b.make} ${b.model}`.toLowerCase().includes(q)) &&
+    (!words.length || words.every(re => re.test(`${b.title} ${b.make} ${b.model}`.toLowerCase()))) &&
     (!f.make || b.make.toLowerCase().includes(f.make.toLowerCase())) &&
     (!f.type || b.classCode.toLowerCase().includes(f.type.toLowerCase())) &&
     (!f.minLen || (Number.isFinite(b.lengthFt) && (b.lengthFt as number) >= minLen)) &&
@@ -480,81 +487,21 @@ function FilterBar({ boats, filters, onChange }: { boats: PublicBoat[]; filters:
 }
 
 /**
- * The wider-marketplace tier, shown under FYI's own boats.
- *
- * Renders nothing at all when its feed comes back empty. It stays empty while
- * `BOATS_API_KEY` is scoped to FYI's own book (every row is filtered out by
- * `!isFyiCompany`); a broader BoatsGroup entitlement lights it up with no
- * code change. Deliberately no "no results" copy: an empty marketplace tier
- * is not information a visitor needs, and a permanently-empty block reads as
- * broken.
+ * FYI's own boats and the co-brokerage market as one search: the same filters
+ * and sort drive both, FYI Exclusives come first, co-brokerage boats follow.
  */
-function WorldwideTier({
-  title, blurb, load, deps, filter,
-}: {
-  title: string;
-  blurb: string;
-  load: () => Promise<PublicBoat[]>;
-  deps: unknown[];
-  /** Applied client-side, so category pages scope the tier the same way they scope FYI's grid. */
-  filter?: (b: PublicBoat) => boolean;
-}) {
-  const [boats, setBoats] = useState<PublicBoat[]>([]);
-  const [shown, setShown] = useState(24);
-  useEffect(() => {
-    let alive = true;
-    setShown(24);
-    load().then(rows => { if (alive) setBoats(filter ? rows.filter(filter) : rows); }).catch(() => {});
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-
-  if (boats.length === 0) return null;
-
-  return (
-    <section className="border-t border-yacht-900/10 bg-white px-6 py-14 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SectionHead eyebrow="Beyond our docks" title={title} />
-        <p className="mt-4 max-w-2xl text-[15px] font-light leading-7 text-yacht-900/70">
-          {blurb} {boats.length} available.
-        </p>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {boats.slice(0, shown).map(b => <BoatCard key={`${b.source}-${b.id}`} boat={b} />)}
-        </div>
-        {shown < boats.length && (
-          <div className="mt-10 text-center">
-            <button
-              type="button"
-              onClick={() => setShown(n => n + 24)}
-              className="border border-yacht-900/20 px-8 py-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-yacht-900/70 transition-colors hover:border-yacht-brand hover:text-yacht-brand"
-            >
-              Show more ({boats.length - shown} left)
-            </button>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-/** FYI's own boats, then the wider BoatsGroup marketplace. */
-export function TieredInventory({ make, filter, emptyNote }: {
-  /** Brand name passed through to the marketplace feed, e.g. "Benetti". */
+export function TieredInventory({ make, filter, cobrokerage, emptyNote }: {
+  /** Brand name sent to the co-brokerage search, e.g. "Benetti". */
   make?: string;
   filter: (b: PublicBoat) => boolean;
+  /** The page's scope for the co-brokerage search (see CategoryPage.cobrokerage). */
+  cobrokerage?: Record<string, string>;
   emptyNote: string;
 }) {
   return (
     <>
-      <InventoryGrid filter={filter} emptyNote={emptyNote} />
+      <InventoryGrid make={make} filter={filter} scope={cobrokerage} emptyNote={emptyNote} />
       <LeaseToOwnBand />
-      <WorldwideTier
-        title={make ? `More ${make}s from the worldwide market` : 'More from the worldwide market'}
-        blurb="Listed by other brokerages and available through FYI. Your consultant represents you on any of them."
-        load={() => fetchWorldwideBoatsGroup(make)}
-        deps={[make]}
-        filter={make ? undefined : filter}
-      />
     </>
   );
 }
@@ -660,59 +607,160 @@ function BrandAlertSignup({ brand }: { brand: string }) {
   );
 }
 
-function InventoryGrid({ filter, emptyNote }: { filter: (b: PublicBoat) => boolean; emptyNote: string }) {
+const ts = (iso?: string): number => (iso ? Date.parse(iso) || 0 : 0);
+
+function sortBoats(boats: PublicBoat[], sort: SortKey): PublicBoat[] {
+  const arr = [...boats];
+  const v = (n?: number) => (Number.isFinite(n) ? (n as number) : -1);
+  switch (sort) {
+    case 'price-asc': arr.sort((a, b) => (v(a.priceUsd) === -1 ? 1 : v(b.priceUsd) === -1 ? -1 : v(a.priceUsd) - v(b.priceUsd))); break;
+    case 'price-desc': arr.sort((a, b) => v(b.priceUsd) - v(a.priceUsd)); break;
+    case 'length-desc': arr.sort((a, b) => v(b.lengthFt) - v(a.lengthFt)); break;
+    default: arr.sort((a, b) => ts(b.listedAt) - ts(a.listedAt));
+  }
+  return arr;
+}
+
+/**
+ * The co-brokerage request for the visitor's filters inside the page's scope.
+ * Ranges narrow to the tighter bound; other scope keys apply unless the
+ * visitor set their own.
+ */
+function cobrokerageParams(f: Filters, sort: SortKey, make?: string, scope: Record<string, string> = {}): Record<string, string> {
+  const out: Record<string, string> = { ...scope };
+  for (const [k, v] of Object.entries(f)) if (v) out[k] = v;
+  if (make && !f.make) out.make = make;
+  const tighter = (k: 'minLen' | 'maxLen', pick: (a: number, b: number) => number) => {
+    if (scope[k] && f[k]) out[k] = String(pick(numOr(scope[k], 0), numOr(f[k], 0)));
+  };
+  tighter('minLen', Math.max);
+  tighter('maxLen', Math.min);
+  out.sort = sort;
+  return out;
+}
+
+interface CoState {
+  boats: PublicBoat[];
+  numResults: number;
+  nextStart: number;
+  hasMore: boolean;
+  loading: boolean;
+  error: boolean;
+}
+const CO_EMPTY: CoState = { boats: [], numResults: 0, nextStart: 0, hasMore: false, loading: true, error: false };
+
+function InventoryGrid({ make, filter, scope, emptyNote }: {
+  make?: string;
+  filter: (b: PublicBoat) => boolean;
+  scope?: Record<string, string>;
+  emptyNote: string;
+}) {
   const { loading, boats } = useInventory(filter);
-  const [sort, setSort] = useState<SortKey>('price-desc');
   const [params, setParams] = useSearchParams();
   const filters: Filters = useMemo(() => readFilters(params), [params]);
-  const setFilters = (f: Filters) => {
+  const sort: SortKey = SORT_KEYS.includes(params.get('sort') as SortKey) ? (params.get('sort') as SortKey) : 'newest';
+  const writeParams = (f: Filters, s: SortKey) => {
     // Only the canonical min/max keys are written back, so a URL that arrived
     // with a legacy bucket param is rewritten in the new shape on first edit.
     const next = new URLSearchParams();
     for (const [k, v] of Object.entries(f)) if (v) next.set(k, v);
+    if (s !== 'newest') next.set('sort', s);
     setParams(next, { replace: true });
   };
-  const filtered = useMemo(() => applyFilters(boats, filters), [boats, filters]);
+  const setFilters = (f: Filters) => writeParams(f, sort);
 
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    const v = (n?: number) => (Number.isFinite(n) ? (n as number) : -1);
-    switch (sort) {
-      case 'price-asc': arr.sort((a, b) => (v(a.priceUsd) === -1 ? 1 : v(b.priceUsd) === -1 ? -1 : v(a.priceUsd) - v(b.priceUsd))); break;
-      case 'length-desc': arr.sort((a, b) => v(b.lengthFt) - v(a.lengthFt)); break;
-      case 'year-desc': arr.sort((a, b) => v(b.year) - v(a.year)); break;
-      default: arr.sort((a, b) => v(b.priceUsd) - v(a.priceUsd));
-    }
-    return arr;
-  }, [filtered, sort]);
+  const exclusives = useMemo(() => sortBoats(applyFilters(boats, filters), sort), [boats, filters, sort]);
+
+  // Co-brokerage: PLS searches, sorts and pages. Any change to the request
+  // starts over at the first page; typing is debounced so each keystroke
+  // doesn't become a search.
+  const request = useMemo(
+    () => JSON.stringify(cobrokerageParams(filters, sort, make, scope)),
+    [filters, sort, make, scope],
+  );
+  const [co, setCo] = useState<CoState>(CO_EMPTY);
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const inflight = useRef<AbortController | null>(null);
+
+  const load = (start: number, reset: boolean) => {
+    inflight.current?.abort();
+    const ctl = new AbortController();
+    inflight.current = ctl;
+    setCo(c => ({ ...(reset ? CO_EMPTY : c), loading: true, error: false }));
+    searchCobrokerage(JSON.parse(request), start, PAGE_SIZE, ctl.signal)
+      .then(page => {
+        if (ctl.signal.aborted) return;
+        setCo(c => {
+          // Same boat on two PLS pages (the order shifted between calls) shows once.
+          const seen = new Set(reset ? [] : c.boats.map(b => b.id));
+          const fresh = page.boats.filter(b => !seen.has(b.id));
+          return {
+            boats: reset ? fresh : [...c.boats, ...fresh],
+            numResults: page.numResults,
+            nextStart: page.nextStart,
+            hasMore: page.hasMore,
+            loading: false,
+            error: false,
+          };
+        });
+      })
+      .catch(() => {
+        if (!ctl.signal.aborted) setCo(c => ({ ...c, loading: false, error: true, hasMore: false }));
+      });
+  };
+
+  useEffect(() => {
+    setVisible(PAGE_SIZE);
+    setCo(CO_EMPTY);
+    const t = window.setTimeout(() => load(0, true), 300);
+    return () => { window.clearTimeout(t); inflight.current?.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
+  // "Show more" reveals the next 24. FYI Exclusives are already all loaded;
+  // once the reveal runs past what co-brokerage has loaded, fetch its next page.
+  const needCo = visible - exclusives.length;
+  useEffect(() => {
+    if (needCo > co.boats.length && co.hasMore && !co.loading) load(co.nextStart, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needCo, co.boats.length, co.hasMore, co.loading]);
+
+  const shownExclusives = exclusives.slice(0, visible);
+  const shownCo = co.boats.slice(0, Math.max(0, visible - exclusives.length));
+  const total = exclusives.length + co.numResults;
+  const settled = !loading && !co.loading;
+  const canShowMore = visible < exclusives.length + co.boats.length || co.hasMore;
+  const stillLoading = loading || (co.loading && co.boats.length === 0 && exclusives.length === 0);
 
   return (
     <section className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
-      {!loading && boats.length > 0 && (
+      {!loading && (
         <div className="mb-6">
           <FilterBar boats={boats} filters={filters} onChange={setFilters} />
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-yacht-900/50">
-          {loading ? 'Loading inventory…' : `${sorted.length} ${sorted.length === 1 ? 'vessel' : 'vessels'} available`}
+        <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-yacht-900/50" aria-live="polite">
+          {settled || co.boats.length > 0
+            ? `${total.toLocaleString('en-US')} ${total === 1 ? 'yacht' : 'yachts'}`
+            : 'Searching…'}
         </p>
         <label className="flex items-center gap-2 text-[12px] text-yacht-900/60">
           Sort
           <select
             value={sort}
-            onChange={e => setSort(e.target.value as SortKey)}
+            onChange={e => writeParams(filters, e.target.value as SortKey)}
             className="rounded-lg border border-yacht-900/20 bg-white px-3 py-2 text-[13px] text-yacht-900 focus:border-yacht-brand focus:outline-none"
           >
+            <option value="newest">Newest first</option>
             <option value="price-desc">Price: high to low</option>
             <option value="price-asc">Price: low to high</option>
             <option value="length-desc">Length: longest first</option>
-            <option value="year-desc">Year: newest first</option>
           </select>
         </label>
       </div>
 
-      {loading ? (
+      {stillLoading ? (
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
           {Array.from({ length: 6 }, (_, i) => (
             <div key={i} className="animate-pulse bg-white shadow-sm">
@@ -729,7 +777,7 @@ function InventoryGrid({ filter, emptyNote }: { filter: (b: PublicBoat) => boole
             </div>
           ))}
         </div>
-      ) : !loading && sorted.length === 0 ? (
+      ) : settled && total === 0 ? (
         <div className="mt-12 border border-dashed border-yacht-900/20 p-12 text-center">
           <Ship className="mx-auto h-8 w-8 text-yacht-brand" />
           <p className="mx-auto mt-4 max-w-md text-[15px] font-light leading-7 text-yacht-900/70">{emptyNote}</p>
@@ -738,9 +786,31 @@ function InventoryGrid({ filter, emptyNote }: { filter: (b: PublicBoat) => boole
           </a>
         </div>
       ) : (
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {sorted.map(b => <BoatCard key={b.id} boat={b} />)}
-        </div>
+        <>
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {shownExclusives.map(b => <BoatCard key={`fyi-${b.id}`} boat={b} />)}
+            {shownExclusives.length > 0 && shownCo.length > 0 && (
+              <div className="col-span-full flex items-center gap-4 py-2" role="separator">
+                <span className="h-px flex-1 bg-yacht-900/15" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-yacht-900/45">Additional listings</span>
+                <span className="h-px flex-1 bg-yacht-900/15" />
+              </div>
+            )}
+            {shownCo.map(b => <BoatCard key={`co-${b.id}`} boat={b} />)}
+          </div>
+          {canShowMore && (
+            <div className="mt-10 text-center">
+              <button
+                type="button"
+                disabled={co.loading && visible - exclusives.length > co.boats.length}
+                onClick={() => setVisible(n => n + PAGE_SIZE)}
+                className="border border-yacht-900/20 px-8 py-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-yacht-900/70 transition-colors hover:border-yacht-brand hover:text-yacht-brand disabled:opacity-50"
+              >
+                {co.loading && visible - exclusives.length > co.boats.length ? 'Loading…' : 'Show more'}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
@@ -1003,10 +1073,11 @@ export function CategoryInventoryPage({ config }: { config: CategoryPage }) {
           }
         />
       )}
-      {/* FYI's boats first, then the wider market underneath, scoped to the
-          category and hidden while its feed is empty. */}
+      {/* One search: FYI's boats first, then co-brokerage boats in the same
+          category. */}
       <TieredInventory
         filter={config.filter}
+        cobrokerage={config.cobrokerage}
         emptyNote="Nothing in this category is listed with us right now — but our brokers source vessels worldwide. Tell us what you're after."
       />
       {worldwide && <WorldwideSourcing />}
@@ -1271,7 +1342,9 @@ function BrandMarqueImage({ brand }: { brand: BrandPage }) {
     if (own) return;
     let alive = true;
     (async () => {
-      const bg = await fetchWorldwideBoatsGroup(brand.name).catch(() => [] as PublicBoat[]);
+      const bg = await searchCobrokerage({ make: brand.name, sort: 'price-desc' })
+        .then(page => page.boats)
+        .catch(() => [] as PublicBoat[]);
       if (alive) setFallback(pickFlagship(bg, brand.match));
     })();
     return () => { alive = false; };
@@ -1387,8 +1460,7 @@ export function BrandInventoryPage({ brand }: { brand: BrandPage }) {
       <BrandBrowse brand={brand} />
 
       <div id="inventory" className="scroll-mt-24" />
-      {/* FYI's own boats first, then the worldwide tiers (which hide when their
-          feeds are empty — see TieredInventory). */}
+      {/* One search: FYI's own boats of this brand first, then co-brokerage. */}
       <TieredInventory
         make={brand.name}
         filter={filter}

@@ -1210,16 +1210,17 @@ function parseHeroQuery(raw: string): URLSearchParams {
   }
 
   // Year — a stated year is a floor ("2020 Azimut" means 2020 or newer).
+  // `year` is the key the inventory grid reads (it was `minYear`, which
+  // nothing read, so a stated year was silently dropped).
   const yr = q.match(/\b(19|20)\d{2}\b/);
-  if (yr) p.set('minYear', yr[0]);
+  if (yr) p.set('year', yr[0]);
 
-  // A brand followed by a bare 2-digit model number ("Azimut 68") — model
-  // numbers in that range track hull length closely, so treat it as an
-  // approximate length. 3-digit models (Sundancer 500 = 50ft) don't, and are
-  // left for the keyword fallback.
-  if (brand && !p.has('minLen') && !p.has('minYear')) {
-    const modelNum = q.match(/\b([2-9]\d)\b/);
-    if (modelNum) band(parseInt(modelNum[1], 10));
+  // A brand plus a bare model number ("50 Azimut", "Azimut 68", "Sundancer
+  // 500") searches for that model: make + keyword, the same split the
+  // inventory search box makes, so both land on the same results.
+  if (brand && !p.has('minLen') && !p.has('year')) {
+    const modelNum = q.match(/\b(\d{2,4})\b/);
+    if (modelNum) p.set('q', modelNum[1]);
   }
 
   if (/\bnew\b/.test(q)) p.set('condition', 'new');
