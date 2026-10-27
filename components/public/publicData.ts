@@ -1,3 +1,5 @@
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+
 /**
  * Data layer for the public SEO pages that mirror fyiyachts.com's URL
  * structure (see the page-sitemap there). Slugs are kept IDENTICAL to the
@@ -13,7 +15,10 @@ export type BoatSource = 'fyi' | 'cobrokerage' | 'boatsgroup';
 
 export interface PublicBoat {
   id: string;
+  /** Card title: "{Year} {Make} {Model}" (see utils/boatTitle). */
   title: string;
+  /** The boat's given name ("On the DL"), shown as a secondary line on cards. */
+  boatName?: string;
   make: string;
   model: string;
   year?: number;
@@ -120,7 +125,8 @@ export function normalizePublicBoat(it: Record<string, any>): PublicBoat | null 
   const loc = it.BoatLocation || {};
   return {
     id,
-    title: it.BoatName || [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ').trim() || 'Yacht',
+    title: yachtTitle(it.ModelYear, it.MakeString, it.Model) || String(it.BoatName || '').trim() || 'Yacht',
+    boatName: boatNameLine(it.BoatName, yachtTitle(it.ModelYear, it.MakeString, it.Model)),
     make: it.MakeString || '',
     model: it.Model || '',
     year: it.ModelYear ? Number(it.ModelYear) : undefined,

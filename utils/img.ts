@@ -49,12 +49,36 @@ function snapWidth(w: number): number {
 const PROD = import.meta.env.PROD;
 const IMG_OPT = PROD && import.meta.env.VITE_IMG_OPT !== '0';
 
-// The boats-feed photo hosts refuse the optimizer's fetches (see api/img.ts),
-// so their URLs route through our own /api/img proxy — on the canonical host,
-// because the optimizer's allowlist carries fyiyachts.com, not preview
-// domains. Until the proxy is live in production, preview deploys fall back
-// to raw URLs for these two hosts only.
-const PROXIED_HOSTS = new Set(['images.boatsgroup.com', 'imt.boatwizard.com']);
+// imt.boatwizard.com refuses the optimizer's fetches (see api/img.ts), so its
+// URLs route through our own /api/img proxy — on the canonical host, because
+// the optimizer's allowlist carries fyiyachts.com, not preview domains.
+// images.boatsgroup.com used to go the same way; it now uses BoatsGroup's own
+// resizer instead (bgResize below).
+const PROXIED_HOSTS = new Set(['imt.boatwizard.com']);
+
+/**
+ * BoatsGroup photos, resized by BoatsGroup's own CDN: /images/… → /resize/…
+ * ?w=&h=. The optimizer route fetched the full-size original through
+ * /api/img on every first view (nearly every co-brokerage photo is a first
+ * view), which is what made grids slow; the resizer answers a 640px image in
+ * ~0.35s (checked 2026-10-27). h is the 4:3 card box; BoatsGroup fits the
+ * photo inside it and keeps the photo's own aspect ratio. A URL that is
+ * already a /resize/ URL (resizeBG in publicData) gets its w/h replaced
+ * rather than nested. Null for any other host or path.
+ */
+const BG_HOST = 'images.boatsgroup.com';
+function bgResize(src: string, width: number): string | null {
+  let u: URL;
+  try { u = new URL(src); } catch { return null; }
+  if (u.hostname !== BG_HOST) return null;
+  if (u.pathname.startsWith('/images/')) u.pathname = `/resize/${u.pathname.slice('/images/'.length)}`;
+  else if (!u.pathname.startsWith('/resize/')) return null;
+  const w = Math.max(1, Math.round(width));
+  u.search = '';
+  u.searchParams.set('w', String(w));
+  u.searchParams.set('h', String(Math.round(w * 0.75)));
+  return u.toString();
+}
 const SITE = 'https://fyiyachts.com';
 
 /**
@@ -77,6 +101,8 @@ function fetchableSrc(src: string): string | null {
 
 export function optImg(src: string | undefined, width: number, quality = 72): string {
   if (!src || !src.startsWith('http')) return src ?? '';
+  const bg = bgResize(src, width);
+  if (bg) return bg;
   if (!IMG_OPT) return src;
   const fetchable = fetchableSrc(src);
   if (!fetchable) return src;
@@ -84,7 +110,13 @@ export function optImg(src: string | undefined, width: number, quality = 72): st
 }
 
 export function srcSet(src: string | undefined, widths: number[], quality = 72): string | undefined {
-  if (!src || !src.startsWith('http') || !IMG_OPT) return undefined;
+  if (!src || !src.startsWith('http')) return undefined;
+  // BoatsGroup resizes to any width, so no snapping to the optimizer's list.
+  if (bgResize(src, 1)) {
+    return [...new Set(widths.map(Math.round))].sort((a, b) => a - b)
+      .map((w) => `${bgResize(src, w)} ${w}w`).join(', ');
+  }
+  if (!IMG_OPT) return undefined;
   // No optimizer URL means optImg is returning the raw src at every width — a
   // srcSet of identical URLs under different descriptors just misleads the
   // browser's picking, so let the plain src stand alone.

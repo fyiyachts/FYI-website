@@ -11,6 +11,11 @@ import { useJsonLd } from '../../utils/useJsonLd';
 import { Breadcrumbs } from '../public/Breadcrumbs';
 import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track } from '../../utils/analytics';
+import { optImg, srcSet } from '../../utils/img';
+
+/** Hero photo widths and layout size; api/listing.ts preloads the same pair. */
+const HERO_WIDTHS = [640, 960, 1280, 1600];
+const HERO_SIZES = '(min-width: 1280px) 1216px, calc(100vw - 48px)';
 
 // Public, no-login yacht detail page (route: /listing/:id), styled after the
 // listing template on fyiyachts.com (2026-07-22 client request): breadcrumb, big
@@ -280,8 +285,17 @@ export default function PublicListingPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="relative overflow-hidden bg-yacht-900/5">
             <button type="button" onClick={() => setLightbox(0)} aria-label={`View ${gallery.length} photos`} className="block w-full cursor-zoom-in">
+              {/* The page's largest paint: fetched first, at the width it is shown.
+                  api/listing.ts preloads this same src/srcset — keep the two in
+                  step (HERO_WIDTHS / HERO_SIZES). */}
               <img
-                src={gallery[0]}
+                src={optImg(gallery[0], 1280)}
+                srcSet={srcSet(gallery[0], HERO_WIDTHS)}
+                sizes={HERO_SIZES}
+                width={1280}
+                height={960}
+                loading="eager"
+                fetchPriority="high"
                 alt={`${boat.title} — main photo`}
                 className="max-h-[70vh] min-h-[320px] w-full object-cover lg:aspect-[16/8]"
               />
@@ -299,7 +313,7 @@ export default function PublicListingPage() {
               {gallery.slice(1, 7).map((src, idx) => (
                 <button key={src + idx} type="button" onClick={() => setLightbox(idx + 1)} aria-label={`Photo ${idx + 2}`}
                   className="group relative overflow-hidden">
-                  <img src={src} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={optImg(src, 320)} alt="" width={320} height={240} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   {idx === 5 && gallery.length > 7 && (
                     <span className="absolute inset-0 flex items-center justify-center bg-yacht-900/60 text-[13px] font-semibold tracking-widest text-white">
                       +{gallery.length - 7}

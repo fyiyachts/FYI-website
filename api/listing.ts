@@ -61,6 +61,28 @@ const unavailable = (res: VercelResponse) => {
   return res.status(503).send(INDEX_SHELL);
 };
 
+const HERO_WIDTHS = [640, 960, 1280, 1600];
+const HERO_SIZES = '(min-width: 1280px) 1216px, calc(100vw - 48px)';
+
+function bgResizeUrl(src: string, w: number): string | null {
+  let u: URL;
+  try { u = new URL(src); } catch { return null; }
+  if (u.hostname !== 'images.boatsgroup.com') return null;
+  if (u.pathname.startsWith('/images/')) u.pathname = `/resize/${u.pathname.slice('/images/'.length)}`;
+  else if (!u.pathname.startsWith('/resize/')) return null;
+  u.search = '';
+  u.searchParams.set('w', String(w));
+  u.searchParams.set('h', String(Math.round(w * 0.75)));
+  return u.toString();
+}
+
+function bgHeroPreload(src: string): string {
+  const href = bgResizeUrl(src, 1280);
+  if (!href) return '';
+  const set = HERO_WIDTHS.map((w) => `${bgResizeUrl(src, w)} ${w}w`).join(', ');
+  return `<link rel="preload" as="image" href="${esc(href)}" imagesrcset="${esc(set)}" imagesizes="${esc(HERO_SIZES)}" fetchpriority="high" />`;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = String(req.query?.id || '').replace(/[^0-9]/g, '');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -99,6 +121,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // read it have no page origin to resolve against. Self-hosted since the
     // GCS bucket it used to live in went 403 (see components/layout/FYILogo.tsx).
     const hero = images[0] || `${SITE}/brand/fyi-logo-2024.png`;
+    // Preload the hero photo the page will paint first — the same URLs the
+    // React page requests (HERO_WIDTHS / HERO_SIZES in PublicListingPage.tsx
+    // and bgResize in utils/img.ts; the API can't import client modules, so
+    // keep the three in step). BoatsGroup photos only: their resizer is the
+    // URL the page uses; other hosts go through the optimizer, which this
+    // shell can't predict.
+    const heroPreload = images[0] ? bgHeroPreload(images[0]) : '';
     const desc = typeof it.GeneralBoatDescription === 'string'
       ? it.GeneralBoatDescription.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
       : '';
@@ -168,6 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `<meta property="og:url" content="${esc(canonical)}" />`,
       `<meta property="og:image" content="${esc(hero)}" />`,
       `<meta name="twitter:card" content="summary_large_image" />`,
+      ...(heroPreload ? [heroPreload] : []),
       ...jsonLd.map((o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`),
     ].join('\n    ');
 

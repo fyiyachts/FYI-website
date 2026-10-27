@@ -21,6 +21,7 @@ import {
 import FYILogo from '../layout/FYILogo';
 import BriannaWidget from '../chat/BriannaWidget';
 import { optImg, srcSet } from '../../utils/img';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { track as trackEvent } from '../../utils/analytics';
 import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
@@ -154,7 +155,11 @@ const NAV_LINKS: { label: string; href: string; panel?: MegaPanelKey }[] = [
 
 interface FleetCard {
   id: string;
-  name: string;
+  /** Card title: "{Year} {Make} {Model}". */
+  title: string;
+  /** The boat's given name ("Armar"), shown as a secondary line. */
+  boatName?: string;
+  /** Make + model, used to spot relisted duplicates. */
   builder: string;
   length: string;
   year: number | string;
@@ -168,7 +173,8 @@ interface FleetCard {
 const FALLBACK_FLEET: FleetCard[] = [
   {
     id: '10216282',
-    name: 'Armar',
+    title: '2017 Astondoa Century 100',
+    boatName: 'Armar',
     builder: 'Astondoa Century 100',
     length: "100'",
     year: 2017,
@@ -177,7 +183,7 @@ const FALLBACK_FLEET: FleetCard[] = [
   },
   {
     id: '9872081',
-    name: 'Azimut Grande 105',
+    title: '2012 Azimut Grande 105',
     builder: 'Azimut Grande 105',
     length: "105'",
     year: 2012,
@@ -186,7 +192,7 @@ const FALLBACK_FLEET: FleetCard[] = [
   },
   {
     id: '9981084',
-    name: 'Sunseeker 86 Yacht',
+    title: '2021 Sunseeker 86 Yacht',
     builder: 'Sunseeker 86 Yacht',
     length: "86'",
     year: 2021,
@@ -195,7 +201,7 @@ const FALLBACK_FLEET: FleetCard[] = [
   },
   {
     id: '10098671',
-    name: 'Azimut Grande 30M',
+    title: '2017 Azimut Grande 30M',
     builder: 'Azimut Grande 30M',
     length: "95'",
     year: 2017,
@@ -204,7 +210,7 @@ const FALLBACK_FLEET: FleetCard[] = [
   },
   {
     id: '9852959',
-    name: 'Princess Y78',
+    title: '2021 Princess Y78',
     builder: 'Princess Y78',
     length: "81'",
     year: 2021,
@@ -213,7 +219,7 @@ const FALLBACK_FLEET: FleetCard[] = [
   },
   {
     id: '9904333',
-    name: 'Okean 80',
+    title: '2021 OKEAN 80',
     builder: 'OKEAN 80',
     length: "78'",
     year: 2021,
@@ -243,9 +249,11 @@ function toFleetCard(it: Record<string, any>): FleetCard | null {
   const lengthFt = parseFloat(String(it.LengthOverall ?? it.NominalLength ?? '').replace(/[^0-9.]/g, ''));
   const builder = [it.MakeString, it.Model].filter(Boolean).join(' ').trim();
   const priceNum = it.PriceHideInd ? undefined : parseFloat(String(it.NormPrice ?? it.Price ?? '').replace(/[^0-9.]/g, ''));
+  const title = yachtTitle(it.ModelYear, it.MakeString, it.Model);
   return {
     id,
-    name: it.BoatName || builder || 'Yacht',
+    title: title || String(it.BoatName || '').trim() || 'Yacht',
+    boatName: boatNameLine(it.BoatName, title),
     builder: builder || 'FYI Yachts Listing',
     length: Number.isFinite(lengthFt) ? `${Math.round(lengthFt)}'` : '—',
     year: it.ModelYear || '—',
@@ -453,7 +461,7 @@ function fetchTopPicks(): Promise<TopPick[]> {
         .slice(0, TOP_PICK_COUNT)
         .map(({ it, c }) => ({
           id: c.id,
-          title: `${c.year} ${c.builder}`.trim(),
+          title: c.title,
           price: c.price,
           length: c.length,
           // Sized off the raw feed URL, not c.image: resizeBG only rewrites
@@ -697,7 +705,7 @@ function CharterMegaPanel() {
 // spinner while it downloaded. Now the result is cached in sessionStorage
 // (survives navigation) and prefetched while the browser is idle, so the panel
 // is already populated the first time it opens.
-type SoldPick = { id: string; title: string; image: string };
+type SoldPick = { id: string; title: string; boatName?: string | undefined; image: string };
 const SOLD_CACHE_KEY = 'fyi:mega-sold:v1';
 
 let megaSoldCache: SoldPick[] | null = null;
@@ -766,11 +774,12 @@ function fetchSoldPicks(): Promise<SoldPick[]> {
               .filter(Boolean)[0];
             return img ? {
               id: String(it.DocumentID),
-              title: [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ') || it.BoatName || 'Sold yacht',
+              title: yachtTitle(it.ModelYear, it.MakeString, it.Model) || it.BoatName || 'Sold yacht',
+              boatName: boatNameLine(it.BoatName, yachtTitle(it.ModelYear, it.MakeString, it.Model)),
               image: resizeBG(img, 700, 466),
             } : null;
           })
-          .filter((x): x is SoldPick => x !== null)
+          .flatMap((x): SoldPick[] => (x ? [x] : []))
           .slice(0, 3);
         megaSoldCache = picks;
         try { sessionStorage.setItem(SOLD_CACHE_KEY, JSON.stringify(picks)); } catch { /* private mode */ }
@@ -847,6 +856,7 @@ function SellMegaPanel() {
                 <span className="absolute left-3 top-3 bg-yacht-brand px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">Sold</span>
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-yacht-900/90 to-transparent p-3">
                   <p className="truncate text-[11px] font-semibold tracking-wide text-white">{b.title}</p>
+                  {b.boatName && <p className="truncate text-[10px] font-light italic text-white/70">{b.boatName}</p>}
                 </div>
               </div>
             ) : (
@@ -1667,7 +1677,7 @@ function FeaturedFleet() {
         // (client, 2026-09-16). See collapseRelistedHulls.
         const cards = collapseRelistedHulls(
           items.map(toFleetCard).filter((c): c is FleetCard => !!c),
-          (c) => `${c.builder}|${c.name}|${c.length}|${c.price}`,
+          (c) => `${c.builder}|${c.boatName ?? ''}|${c.length}|${c.price}`,
           (c) => Number(c.year),
         )
           .sort((a, b) => {
@@ -1873,8 +1883,12 @@ function FeaturedFleet() {
               <a href={`/listing/${yacht.id}`} className="block" draggable={false}>
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <img
-                    src={yacht.image}
-                    alt={`${yacht.builder} — ${yacht.name}`}
+                    src={optImg(yacht.image, 640)}
+                    srcSet={srcSet(yacht.image, [480, 640, 960])}
+                    sizes="(min-width:640px) 380px, 85vw"
+                    alt={yacht.boatName ? `${yacht.title} — ${yacht.boatName}` : yacht.title}
+                    width={640}
+                    height={480}
                     loading="lazy"
                     draggable={false}
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
@@ -1884,10 +1898,10 @@ function FeaturedFleet() {
                   </span>
                 </div>
                 <div className="p-7">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-yacht-brand">
-                    {yacht.builder}
-                  </p>
-                  <h3 className="mt-2 text-xl font-light tracking-wide text-yacht-900">{yacht.name}</h3>
+                  <h3 className="text-xl font-light tracking-wide text-yacht-900">{yacht.title}</h3>
+                  {yacht.boatName && (
+                    <p className="mt-0.5 truncate text-[14px] font-light italic text-yacht-900/55">{yacht.boatName}</p>
+                  )}
                   <dl className="mt-5 flex items-center gap-6 border-t border-yacht-900/10 pt-5 text-yacht-900/70">
                     <div>
                       <dt className="text-[9px] font-semibold uppercase tracking-[0.2em] text-yacht-900/45">LOA</dt>

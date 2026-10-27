@@ -7,7 +7,8 @@ import { FYI_TEAM, memberBySlug, repKey, telHref, type TeamMember } from '../tea
 import { FYI_BIOS } from '../team/fyiBios';
 import { usePageMeta } from '../../utils/usePageMeta';
 import { PublicInquiryForm } from './PublicPages';
-import { resizeBG } from './publicData';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
 
 /**
  * Public team pages in the new-site design system, mirroring fyiyachts.com's
@@ -128,12 +129,15 @@ export function OurTeamPage() {
 /* -------------------------------------------------------------- profile */
 
 function RepBoatCard({ boat, sold }: { boat: RepBoat; sold?: boolean }) {
-  const image = boat.image ? resizeBG(boat.image, 900, 600) : undefined;
+  const image = boat.image ? optImg(boat.image, 640) : undefined;
+  // `name` is the boat's given name, or year/make/model when it has none.
+  const title = yachtTitle(boat.year, boat.make, boat.model) || boat.name;
+  const boatName = boatNameLine(boat.name, title);
   const body = (
     <>
       <div className="relative aspect-[4/3] overflow-hidden bg-yacht-900/5">
         {image ? (
-          <img src={image} alt={boat.name} loading="lazy" className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 ${sold ? 'saturate-[0.55]' : ''}`} />
+          <img src={image} alt={title} width={640} height={480} loading="lazy" className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 ${sold ? 'saturate-[0.55]' : ''}`} />
         ) : (
           <div className="flex h-full items-center justify-center"><Anchor className="h-8 w-8 text-yacht-900/20" /></div>
         )}
@@ -146,10 +150,8 @@ function RepBoatCard({ boat, sold }: { boat: RepBoat; sold?: boolean }) {
         ) : null}
       </div>
       <div className="p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-yacht-brand">
-          {[boat.year, boat.make].filter(Boolean).join(' ')}
-        </p>
-        <h3 className="mt-1 truncate text-[16px] font-light tracking-wide text-yacht-900">{boat.name}</h3>
+        <h3 className="truncate text-[16px] font-light tracking-wide text-yacht-900">{title}</h3>
+        {boatName && <p className="mt-0.5 truncate text-[13px] font-light italic text-yacht-900/55">{boatName}</p>}
         <div className="mt-3 flex items-center justify-between border-t border-yacht-900/10 pt-3">
           <span className="flex items-center gap-1.5 truncate text-[12px] font-light text-yacht-900/55">
             {boat.city ? (<><MapPin className="h-3.5 w-3.5 shrink-0" />{[boat.city, boat.state || boat.country].filter(Boolean).join(', ')}</>) : (boat.model || '')}

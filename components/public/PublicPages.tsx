@@ -153,7 +153,7 @@ export function ImagePageHero({
 
 /* --------------------------------------------------------- boat grid */
 
-function BoatCard({ boat }: { boat: PublicBoat }) {
+function BoatCard({ boat, priority = false }: { boat: PublicBoat; priority?: boolean }) {
   // Only FYI's own boats have a /listing/:id page. Anything external with no
   // detail page falls back to the enquiry form, vessel pre-filled.
   // Co-brokerage boats (BoatsGroup PLS) have full /listing/:id pages too.
@@ -171,10 +171,14 @@ function BoatCard({ boat }: { boat: PublicBoat }) {
           {boat.image ? (
             <img
               src={optImg(boat.image, 640)}
-              srcSet={srcSet(boat.image, [320, 480, 640])}
+              srcSet={srcSet(boat.image, [320, 480, 640, 960, 1280])}
               sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
-              alt={`${boat.year ?? ''} ${boat.make} ${boat.model} for sale`.trim()}
-              loading="lazy"
+              alt={`${boat.title} for sale`}
+              width={640}
+              height={480}
+              // The first row or two are on screen at load: fetch them now.
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : undefined}
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
           ) : (
@@ -192,10 +196,10 @@ function BoatCard({ boat }: { boat: PublicBoat }) {
           ) : null}
         </div>
         <div className="p-6">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-yacht-brand">
-            {[boat.year, boat.make].filter(Boolean).join(' ')}
-          </p>
-          <h3 className="mt-1.5 text-lg font-light tracking-wide text-yacht-900">{boat.title}</h3>
+          <h3 className="text-lg font-light tracking-wide text-yacht-900">{boat.title}</h3>
+          {boat.boatName && (
+            <p className="mt-0.5 truncate text-[13px] font-light italic text-yacht-900/55">{boat.boatName}</p>
+          )}
           <div className="mt-4 flex items-center justify-between border-t border-yacht-900/10 pt-4">
             <span className="flex items-center gap-1.5 text-[12px] font-light text-yacht-900/55">
               {boat.city || boat.state || boat.country ? (<><MapPin className="h-3.5 w-3.5" />{[boat.city, boat.state || boat.country].filter(Boolean).join(', ')}</>) : boat.model}
@@ -288,7 +292,7 @@ function applyFilters(boats: PublicBoat[], f: Filters): PublicBoat[] {
   const words = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean)
     .map(w => new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   return boats.filter(b =>
-    (!words.length || words.every(re => re.test(`${b.title} ${b.make} ${b.model}`.toLowerCase()))) &&
+    (!words.length || words.every(re => re.test(`${b.title} ${b.boatName ?? ''} ${b.make} ${b.model}`.toLowerCase()))) &&
     (!f.make || b.make.toLowerCase().includes(f.make.toLowerCase())) &&
     (!f.type || b.classCode.toLowerCase().includes(f.type.toLowerCase())) &&
     (!f.minLen || (Number.isFinite(b.lengthFt) && (b.lengthFt as number) >= minLen)) &&
@@ -794,7 +798,7 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
       ) : (
         <>
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {shownExclusives.map(b => <BoatCard key={`fyi-${b.id}`} boat={b} />)}
+            {shownExclusives.map((b, i) => <BoatCard key={`fyi-${b.id}`} boat={b} priority={i < 6} />)}
             {shownExclusives.length > 0 && shownCo.length > 0 && (
               <div className="col-span-full flex items-center gap-4 py-2" role="separator">
                 <span className="h-px flex-1 bg-yacht-900/15" />
@@ -802,7 +806,7 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
                 <span className="h-px flex-1 bg-yacht-900/15" />
               </div>
             )}
-            {shownCo.map(b => <BoatCard key={`co-${b.id}`} boat={b} />)}
+            {shownCo.map((b, i) => <BoatCard key={`co-${b.id}`} boat={b} priority={shownExclusives.length + i < 6} />)}
           </div>
           {canShowMore && (
             <div className="mt-10 text-center">
@@ -993,13 +997,18 @@ export function SoldYachtsPage() {
           </div>
         ) : (
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {boats.map(b => (
+            {boats.map((b, i) => (
               <div key={b.id} className="group overflow-hidden bg-white shadow-sm">
                 <div className="relative overflow-hidden">
                   <img
-                    src={b.image}
+                    src={optImg(b.image, 640)}
+                    srcSet={srcSet(b.image, [320, 480, 640, 960])}
+                    sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
                     alt={`${b.title} — sold by FYI Yachts`}
-                    loading="lazy"
+                    width={640}
+                    height={480}
+                    loading={i < 6 ? 'eager' : 'lazy'}
+                    fetchPriority={i < 6 ? 'high' : undefined}
                     className="aspect-[4/3] w-full object-cover saturate-[0.75] transition-transform duration-700 group-hover:scale-105"
                   />
                   <span className="absolute left-4 top-4 bg-yacht-brand px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
@@ -1007,10 +1016,13 @@ export function SoldYachtsPage() {
                   </span>
                 </div>
                 <div className="p-6">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yacht-900/45">
-                    {[b.lengthFt ? `${Math.round(b.lengthFt)} ft` : null, b.year].filter(Boolean).join(' · ')}
-                  </p>
+                  {b.lengthFt ? (
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yacht-900/45">{Math.round(b.lengthFt)} ft</p>
+                  ) : null}
                   <h3 className="mt-2 truncate text-[15px] font-medium tracking-wide text-yacht-900">{b.title}</h3>
+                  {b.boatName && (
+                    <p className="mt-0.5 truncate text-[13px] font-light italic text-yacht-900/55">{b.boatName}</p>
+                  )}
                 </div>
               </div>
             ))}
@@ -1366,7 +1378,7 @@ function BrandMarqueImage({ brand }: { brand: BrandPage }) {
             src={optImg(hero.image, 1000)}
             srcSet={srcSet(hero.image, [640, 1000, 1400])}
             sizes="(min-width:1024px) 50vw, 100vw"
-            alt={`${hero.year ? `${hero.year} ` : ''}${hero.title} — a ${brand.name} listed with FYI Yachts`}
+            alt={`${hero.title} — a ${brand.name} listed with FYI Yachts`}
             loading="lazy"
             className="h-full w-full object-cover"
           />
@@ -1380,7 +1392,8 @@ function BrandMarqueImage({ brand }: { brand: BrandPage }) {
             />
           )}
           <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-yacht-900/85 to-transparent px-5 pb-4 pt-10 text-[12px] font-light tracking-wide text-white">
-            {hero.year ? `${hero.year} ` : ''}{hero.title}
+            {hero.title}
+            {hero.boatName && <span className="ml-1.5 italic text-white/70">· {hero.boatName}</span>}
           </p>
         </>
       ) : brand.logo ? (
@@ -1670,15 +1683,18 @@ function RecentlySoldStrip() {
             <figure key={b.id} className="group relative aspect-[4/3] overflow-hidden bg-yacht-900/5">
               <img
                 src={optImg(b.image, 640)}
-                alt={`Sold: ${b.year ?? ''} ${b.make} ${b.model}`.trim()}
+                srcSet={srcSet(b.image, [320, 480, 640])}
+                sizes="(min-width:1024px) 25vw, 50vw"
+                alt={`Sold: ${b.title}`}
+                width={640}
+                height={480}
                 loading="lazy"
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
               <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-yacht-900/85 to-transparent px-4 pb-3 pt-10">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-yacht-teal">Sold</span>
-                <span className="block truncate text-[13px] font-light text-white">
-                  {[b.lengthFt ? `${Math.round(b.lengthFt)}′` : '', b.make, b.model].filter(Boolean).join(' ')}
-                </span>
+                <span className="block truncate text-[13px] font-light text-white">{b.title}</span>
+                {b.boatName && <span className="block truncate text-[11px] font-light italic text-white/65">{b.boatName}</span>}
               </figcaption>
             </figure>
           ))}

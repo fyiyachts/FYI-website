@@ -6,6 +6,12 @@ import { useAuth } from '../auth/AuthProvider';
 import type { SavedBoat, SavedSearch } from '../../types/user';
 import { Heart, Search, Bell, BellOff, Trash2, MapPin, TrendingDown } from 'lucide-react';
 import { timeAgo } from '../../utils/formatters';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
+
+/** Card title from the saved specs; boats saved earlier stored the boat's name as `title`. */
+const savedTitle = (b: SavedBoat): string =>
+  yachtTitle(b.specs?.year, b.specs?.make, b.specs?.model) || b.title;
 
 export default function SavedPage() {
   const [boats, setBoats] = useState<SavedBoat[]>([]);
@@ -80,14 +86,17 @@ export default function SavedPage() {
               <div key={boat.id} className="bg-white/5 border border-white/10 rounded-none overflow-hidden group">
                 <Link to={`/app/yacht/${boat.id}`} className="block relative aspect-[4/3] overflow-hidden">
                   {boat.image ? (
-                    <img src={boat.image} alt={boat.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                    <img src={optImg(boat.image, 480)} alt={savedTitle(boat)} width={480} height={360} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                   ) : (
                     <div className="w-full h-full bg-white/5 flex items-center justify-center"><span className="text-white/20 text-sm">No Image</span></div>
                   )}
                 </Link>
                 <div className="p-3">
                   <Link to={`/app/yacht/${boat.id}`} className="block">
-                    <h3 className="text-white font-medium text-sm line-clamp-1">{boat.title}</h3>
+                    <h3 className="text-white font-medium text-sm line-clamp-1">{savedTitle(boat)}</h3>
+                    {boatNameLine(boat.title, savedTitle(boat)) && (
+                      <p className="truncate text-xs font-light italic text-white/50">{boatNameLine(boat.title, savedTitle(boat))}</p>
+                    )}
                     <div className="flex items-center gap-2">
                       <p className="text-yacht-cream font-bold text-lg">{boat.price}</p>
                       <span className="text-[10px] text-yacht-brand/60 bg-yacht-brand/10 px-1.5 py-0.5 rounded flex items-center gap-1">
