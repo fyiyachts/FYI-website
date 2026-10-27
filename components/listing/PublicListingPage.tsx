@@ -56,6 +56,8 @@ interface Boat {
   rep?: string;
   images: string[];
   description?: string;
+  /** PLS courtesy line for co-brokerage boats ("…centrally listed by Yachts360."). */
+  courtesy?: string;
 }
 
 const num = (v: unknown): number | undefined => {
@@ -124,6 +126,7 @@ function normalize(it: any): Boat {
     rep: (it.SalesRep && it.SalesRep.Name) ? String(it.SalesRep.Name).trim() : undefined,
     images: images.slice(0, 30),
     description: typeof it.GeneralBoatDescription === 'string' ? stripHtml(it.GeneralBoatDescription) : undefined,
+    courtesy: typeof it.PlsDisclaimer === 'string' ? stripHtml(it.PlsDisclaimer) || undefined : undefined,
   };
 }
 
@@ -397,6 +400,7 @@ export default function PublicListingPage() {
             this information nor warrant the condition of the vessel. A buyer should instruct his agents, or his surveyors,
             to investigate such details as the buyer desires validated. This vessel is offered subject to prior sale,
             price change or withdrawal without notice.
+            {boat.listingType === 'cobrokerage' && boat.courtesy && <> {boat.courtesy}</>}
           </p>
         </div>
 

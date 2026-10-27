@@ -16,6 +16,7 @@
 //   dedupe so each boat shows once, as the FYI Exclusive version.
 
 const PLS_URL = 'https://services.boats.com/pls/boats/search';
+const PLS_DETAILS_URL = 'https://services.boats.com/pls/boats/details';
 const PLS_KEY = process.env.BOATS_PLS_API_KEY || '';
 const TIMEOUT_MS = 8_000;
 
@@ -59,9 +60,9 @@ const FYI_OFFICE = {
 export function toCobrokerageItem(raw: Record<string, any>, cardOnly = false): Record<string, any> {
   const item: Record<string, any> = { ...raw, ListingType: 'cobrokerage', Source: raw.Source || 'PLS' };
   if (cardOnly && Array.isArray(item.Images)) item.Images = item.Images.slice(0, 1);
-  // Broker fields are absent from PLS. Present the boat as FYI's to sell.
+  // Broker fields are absent from PLS. FYI's office is the contact; no
+  // SalesRep, so listing pages show no "Listed by" line for these boats.
   item.Office = FYI_OFFICE;
-  item.SalesRep = { Name: 'FYI Yachts' };
   return item;
 }
 
@@ -102,9 +103,45 @@ export async function plsSearch(
   };
 }
 
+/**
+ * The PLS courtesy disclaimer for one boat, e.g. "<p>FYI Yachts is pleased to
+ * assist you in the purchase of this vessel. This boat is centrally listed by
+ * Yachts360.</p>". Only the details endpoint returns it. Undefined on any error.
+ */
+export async function plsGetDisclaimer(id: string): Promise<string | undefined> {
+  if (!PLS_KEY || !/^\d+$/.test(id)) return undefined;
+  try {
+    const url = new URL(PLS_DETAILS_URL);
+    url.searchParams.set('key', PLS_KEY);
+    url.searchParams.set('id', id);
+    const res = await fetch(url.toString(), {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return undefined;
+    const body: any = await res.json().catch(() => null);
+    const disclaimer = body?.status === 'success' ? body.data?.PlsDisclaimer : undefined;
+    return typeof disclaimer === 'string' && disclaimer.trim() ? disclaimer : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const toPlainText = (html: string): string =>
+  html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+
 /** One co-brokerage boat by DocumentID, full detail. Undefined when not found. */
 export async function plsGetById(id: string): Promise<Record<string, any> | undefined> {
   if (!PLS_KEY || !/^\d+$/.test(id)) return undefined;
-  const { results } = await plsSearch({ documentid: id, rows: '1' });
-  return results.find((r) => String(r.DocumentID) === id);
+  // The disclaimer is fine print: its failure never fails the listing.
+  const [{ results }, disclaimer] = await Promise.all([
+    plsSearch({ documentid: id, rows: '1' }),
+    plsGetDisclaimer(id).catch(() => undefined),
+  ]);
+  const item = results.find((r) => String(r.DocumentID) === id);
+  if (item && disclaimer) {
+    const text = toPlainText(disclaimer);
+    if (text) item.PlsDisclaimer = text;
+  }
+  return item;
 }
