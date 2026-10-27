@@ -641,13 +641,15 @@ function cobrokerageParams(f: Filters, sort: SortKey, make?: string, scope: Reco
 
 interface CoState {
   boats: PublicBoat[];
+  /** PLS's total less every FYI boat removed from the pages loaded so far. */
   numResults: number;
+  dropped: number;
   nextStart: number;
   hasMore: boolean;
   loading: boolean;
   error: boolean;
 }
-const CO_EMPTY: CoState = { boats: [], numResults: 0, nextStart: 0, hasMore: false, loading: true, error: false };
+const CO_EMPTY: CoState = { boats: [], numResults: 0, dropped: 0, nextStart: 0, hasMore: false, loading: true, error: false };
 
 function InventoryGrid({ make, filter, scope, emptyNote }: {
   make?: string;
@@ -694,9 +696,13 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
           // Same boat on two PLS pages (the order shifted between calls) shows once.
           const seen = new Set(reset ? [] : c.boats.map(b => b.id));
           const fresh = page.boats.filter(b => !seen.has(b.id));
+          // Each page's total is corrected only for its own drops; keep a
+          // running sum so the count doesn't tick up on "Show more".
+          const dropped = (reset ? 0 : c.dropped) + page.dropped;
           return {
             boats: reset ? fresh : [...c.boats, ...fresh],
-            numResults: page.numResults,
+            numResults: Math.max(page.numResults + page.dropped - dropped, 0),
+            dropped,
             nextStart: page.nextStart,
             hasMore: page.hasMore,
             loading: false,

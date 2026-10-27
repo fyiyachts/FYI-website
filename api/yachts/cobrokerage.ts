@@ -211,7 +211,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       // The drop is only known for this page, so the total is corrected by
       // what was seen here; FYI boats on later pages may still be counted.
+      // `dropped` lets a client that pages on keep its own running total.
       numResults: Math.max(data.numResults - dropped, 0),
+      dropped,
       results,
       start,
       rows,

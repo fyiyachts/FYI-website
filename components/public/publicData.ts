@@ -154,8 +154,10 @@ export function normalizePublicBoat(it: Record<string, any>): PublicBoat | null 
  */
 export interface CobrokeragePage {
   boats: PublicBoat[];
-  /** Matches across all pages (FYI's own boats excluded where seen). */
+  /** Matches across all pages, less FYI's own boats found on this page. */
   numResults: number;
+  /** FYI's own boats removed from this page. */
+  dropped: number;
   /** PLS offset for the next page, and whether there is one. */
   nextStart: number;
   hasMore: boolean;
@@ -180,6 +182,7 @@ export async function searchCobrokerage(
       .map(normalizePublicBoat)
       .filter((b): b is PublicBoat => b !== null && !isFyiCompany(b.company)),
     numResults: Number(data?.numResults) || 0,
+    dropped: Number(data?.dropped) || 0,
     nextStart: Number(data?.nextStart) || start + rows,
     hasMore: !!data?.hasMore,
   };
