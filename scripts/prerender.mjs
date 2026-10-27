@@ -40,7 +40,10 @@ const redirectedPaths = new Set(
 const dataOut = join(root, 'node_modules', '.cache', 'seo-data.mjs');
 mkdirSync(dirname(dataOut), { recursive: true });
 execSync(`npx esbuild scripts/seoData.ts --bundle --format=esm --platform=node --outfile=${JSON.stringify(dataOut)}`, { cwd: root, stdio: 'pipe' });
-const { buildRoutes, fetchBuildInventory, attachHubInventory } = await import(pathToFileURL(dataOut).href);
+const {
+  buildRoutes, fetchBuildInventory, attachHubInventory,
+  BRAND_PAGES, CATEGORY_PAGES, FYI_TEAM, MANUAL_LISTING_COUNT,
+} = await import(pathToFileURL(dataOut).href);
 
 const archiveIndex = JSON.parse(readFileSync(join(root, 'public', 'news', 'index.json'), 'utf8'));
 const newsIndex = [...archiveIndex].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -273,53 +276,62 @@ writeFileSync(join(dist, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY);
 
 // robots.txt — AI crawlers explicitly welcomed (GEO workstream): being
 // citable by ChatGPT/Claude/Perplexity/Gemini is a client goal.
-writeFileSync(join(dist, 'robots.txt'), `User-agent: *
-Allow: /
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Claude-User
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-Disallow: /admin/
-Disallow: /internal-stats
-
-Sitemap: ${SITE}/sitemap.xml
-`);
+//
+// Every group carries the same rules. A crawler obeys only the most specific
+// group that names it and ignores `*`, so a Disallow under one bot (as
+// /admin/ used to be, under Google-Extended alone) binds nobody else.
+const ROBOTS_AGENTS = [
+  '*',
+  'GPTBot', 'OAI-SearchBot', 'ChatGPT-User',
+  'ClaudeBot', 'Claude-User',
+  'PerplexityBot',
+  'Google-Extended',
+  'Applebot', 'Applebot-Extended',
+  'Bingbot',
+  'CCBot',
+  'Meta-ExternalAgent',
+  'Amazonbot',
+];
+const ROBOTS_RULES = ['Allow: /', 'Disallow: /admin/', 'Disallow: /app/', 'Disallow: /internal-stats'];
+writeFileSync(
+  join(dist, 'robots.txt'),
+  ROBOTS_AGENTS.map((ua) => [`User-agent: ${ua}`, ...ROBOTS_RULES].join('\n')).join('\n\n')
+    + `\n\nSitemap: ${SITE}/sitemap.xml\n`,
+);
 
 // llms.txt — the emerging convention AI engines read for a site synopsis.
+// Counts come from the build: the live exclusive book (BoatsGroup feed +
+// hand-entered listings) when the feed answered, "100+" when it didn't; the
+// team from the roster the /consultants pages are built from.
 const newsTop = newsIndex.slice(0, 15);
+const exclusiveCount = inventory.fyi.length ? inventory.fyi.length + MANUAL_LISTING_COUNT : 0;
+const exclusiveLabel = exclusiveCount ? `${exclusiveCount}` : '100+';
+const brandCount = new Set(BRAND_PAGES.map((b) => b.name)).size;
+const cat = (slug) => {
+  const c = CATEGORY_PAGES.find((x) => x.slug === slug);
+  return c ? `[${c.h1}](${SITE}/${c.slug})` : null;
+};
+const categoryLinks = [
+  'super-yachts-for-sale', '60-to-80-ft-yachts-for-sale', 'yachts-for-sale-miami', 'new-yachts-for-sale',
+  'used-yachts-for-sale', 'small-yachts-for-sale', 'sport-fishing-yachts-for-sale',
+  'center-console-boats-for-sale', 'catamaran-yachts-for-sale',
+].map(cat).filter(Boolean).join(' · ');
 writeFileSync(join(dist, 'llms.txt'), `# FYI Yachts — Florida Yachts International
 
 > Miami luxury yacht brokerage founded in 1994, headquartered at 2424 Coral Way, Miami, FL 33145, serving Coral Gables, Coconut Grove, Miami, Miami Beach, Key Biscayne, Fort Lauderdale, and buyers worldwide. 300+ years of combined consultant experience. Yacht sales, charters, financing, lease-to-own, and new construction. Phone +1-305-854-6020, sales@fyiyachts.com.
 
 ## Inventory
-- [Yachts for Sale](${SITE}/yachts-for-sale): full live inventory (~140 vessels)
-- [Super Yachts](${SITE}/super-yachts-for-sale) · [60–80 ft Yachts](${SITE}/60-to-80-ft-yachts-for-sale) · [Yachts in Miami](${SITE}/yachts-for-sale-miami) · [Center Consoles](${SITE}/center-console-boats-for-sale) · [Sport Fishing](${SITE}/sport-fishing-boats-for-sale) · [Catamarans](${SITE}/catamarans-for-sale)
-- Brand pages for 37 builders (Azimut, Sunseeker, Riva, Sanlorenzo, Pershing, Sea Ray, …) at /<brand>-yachts-for-sale
+- [Yachts for Sale](${SITE}/yachts-for-sale): ${exclusiveLabel} FYI Yachts exclusive listings, plus access to ~9,000 co-brokerage yachts listed by other brokerages (United States, power, 35–120 ft) that FYI can sell — all searchable in one place by builder, model, length, price, year and condition
+- [Current exclusive listings, plain text](${SITE}/llms-inventory.txt): every FYI exclusive with year, builder, model, length, price, location and link — updated live
+- ${categoryLinks}
+- Brand pages for ${brandCount} builders (Azimut, Sunseeker, Riva, Sanlorenzo, Pershing, Sea Ray, …) at /<brand>-yachts-for-sale
 - [Sold Yachts](${SITE}/sold-yachts): recent closings
 
 ## Services
 - [Sell Your Yacht](${SITE}/sell) · [Charter](${SITE}/charter) · [Financing](${SITE}/yacht-financing) · [Lease-to-Own](${SITE}/lease-to-own) · [Closing Services](${SITE}/yacht-closing-services)
 
 ## People
-- [Our Team](${SITE}/our-team): ${routes.filter((r) => r.path.startsWith('/consultants/')).length} licensed yacht consultants with live listings and sold history
+- [Our Team](${SITE}/our-team): ${FYI_TEAM.length} yacht consultants and staff, each with a profile at /consultants/<name> showing their live listings and sold history
 
 ## News
 ${newsTop.map((p) => `- [${p.title}](${SITE}/${p.slug})`).join('\n')}
@@ -334,7 +346,7 @@ writeFileSync(
   `// AUTO-GENERATED by scripts/prerender.mjs — do not edit.\n// The built index.html shell (hashed asset tags) for server-rendered\n// listing pages (api/listing/[id].ts).\nexport const INDEX_SHELL = ${JSON.stringify(template)};\n`,
 );
 
-console.log(`prerendered ${written} routes + sitemap.xml (index) + sitemap-pages.xml + robots.txt + llms.txt + ${INDEXNOW_KEY}.txt + indexShell (${SITE})`);
+console.log(`prerendered ${written} routes + sitemap.xml (index) + sitemap-pages.xml + robots.txt + llms.txt (${exclusiveLabel} exclusives, ${FYI_TEAM.length} team) + ${INDEXNOW_KEY}.txt + indexShell (${SITE})`);
 
 // Analytics: utils/analytics.ts ships FYI's own measurement ID as a committed
 // default, so events flow whether or not VITE_GA4_ID is set. This line stays

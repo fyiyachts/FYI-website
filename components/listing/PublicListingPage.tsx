@@ -200,6 +200,22 @@ export default function PublicListingPage() {
     return () => { alive = false; };
   }, [id]);
 
+  // Co-brokerage boats: usable but not indexed (api/listing.ts sends the same
+  // meta + X-Robots-Tag). Set for them, removed for every other boat — the SPA
+  // can move between listings without a reload, so a stale tag must not stay.
+  useEffect(() => {
+    const existing = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    if (boat?.listingType === 'cobrokerage') {
+      const tag = existing ?? document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'robots' }));
+      tag.content = 'noindex, follow';
+    } else if (boat && existing) {
+      existing.remove();
+    }
+    return () => {
+      document.head.querySelector('meta[name="robots"][content="noindex, follow"]')?.remove();
+    };
+  }, [boat]);
+
   // Product markup only for priced listings with a photo: without an offer
   // (or the reviews listings never have) Google flags the Product as an
   // invalid item in Search Console instead of showing a rich result.

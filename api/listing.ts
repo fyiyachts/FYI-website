@@ -105,6 +105,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!it) it = await plsGetById(id).catch(() => undefined);
     if (!it) return notFound(res);
 
+    // Co-brokerage boats are usable (linked, browsable, shareable) but kept
+    // out of the index: they are other brokerages' listings, also live on
+    // their own sites. FYI's own and manual listings stay fully indexed.
+    // Canonical, content and Product schema are unchanged either way.
+    const noindex = it.ListingType === 'cobrokerage';
+    if (noindex) res.setHeader('X-Robots-Tag', 'noindex, follow');
+
     const loc = it.BoatLocation || {};
     const title = it.BoatName || [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ').trim() || 'Yacht';
     const price = it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price);
@@ -190,6 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `<title>${esc(pageTitle)}</title>`,
       `<meta name="description" content="${esc(metaDesc)}" />`,
       `<link rel="canonical" href="${esc(canonical)}" />`,
+      ...(noindex ? ['<meta name="robots" content="noindex, follow" />'] : []),
       `<meta property="og:type" content="product" />`,
       `<meta property="og:site_name" content="FYI Yachts" />`,
       `<meta property="og:title" content="${esc(pageTitle)}" />`,

@@ -8,6 +8,7 @@ import {
 import { CONTENT_PAGES } from '../components/public/contentData';
 import { FYI_TEAM, memberByRepKey, memberBySlug, repKey, type TeamMember } from '../components/team/fyiTeam';
 import { FYI_BIOS } from '../components/team/fyiBios';
+import { MANUAL_LISTINGS } from '../api/_lib/manualListings';
 import { CHARTER_FAQS, SELL_FAQS, LEASE_FAQS, type QA } from '../components/public/faqData';
 import { CATEGORY_FAQS, ABOUT_FAQS, CONTACT_FAQS, GENERAL_FAQS } from '../components/public/categoryFaqs';
 import { CASE_STUDIES } from '../components/public/caseStudyData';
@@ -1108,3 +1109,8 @@ export function attachHubInventory(routes: SeoRoute[], inv: { fyi: PublicBoat[];
   }
   return touched;
 }
+
+// For llms.txt (scripts/prerender.mjs): the same lists the site routes from,
+// so its links and counts can't drift from the pages that exist.
+export { BRAND_PAGES, CATEGORY_PAGES, FYI_TEAM };
+export const MANUAL_LISTING_COUNT = MANUAL_LISTINGS.length;
