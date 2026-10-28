@@ -13,6 +13,10 @@ import { CHARTER_FAQS, SELL_FAQS, LEASE_FAQS, type QA } from '../components/publ
 import { CATEGORY_FAQS, ABOUT_FAQS, CONTACT_FAQS, GENERAL_FAQS } from '../components/public/categoryFaqs';
 import { CASE_STUDIES } from '../components/public/caseStudyData';
 import { getBrandDetail } from '../components/public/brandContent';
+import { createElement } from 'react';
+import { renderToString } from 'react-dom/server';
+import { LpShell } from '../components/lp/LpChrome';
+import { CC_FAQS, CC_HERO, LP_DESCRIPTION, LP_PATH, LP_TITLE, isCenterConsole } from '../components/lp/ccContent';
 import {
   ALL_CHARTER_VESSELS, CHARTER_FLEET, TERM_CHARTER, CHARTER_INCLUDES,
   CHARTER_FROM_PRICE, CHARTER_PHONE_DISPLAY, CHARTER_EMAIL, isTermVessel,
@@ -53,6 +57,13 @@ export interface SeoRoute {
   // wrong question to ask about a route, and answering it that way labelled a
   // commercial category page "FYI News".
   isNews?: boolean;
+  // Kept out of search: prerender emits a robots noindex tag and leaves the
+  // route out of the sitemap. The paid-traffic landing pages (/lp/*).
+  noindex?: boolean;
+  // The page's own first paint, used instead of the generic static shell. The
+  // landing pages set it so the CDN serves the header and hero React mounts
+  // over, rather than a stand-in that gets swapped out (and moves the LCP).
+  shellHtml?: string;
 }
 
 const ORG = {
@@ -202,6 +213,17 @@ const BRAND_SLUG_ALIASES: Record<string, string> = {
 
 export function buildRoutes(newsIndex: { slug: string; title: string; date: string; category: string; image: string; excerpt: string }[]): SeoRoute[] {
   const routes: SeoRoute[] = [];
+
+  // ChatGPT Ads landing page: noindex, no nav, not in the sitemap. The shell
+  // gets the live count in attachLandingShells once the build feed answers.
+  routes.push({
+    path: LP_PATH,
+    title: LP_TITLE,
+    description: LP_DESCRIPTION,
+    noindex: true,
+    jsonLd: [faqSchema(CC_FAQS)],
+    shellHtml: landingShell(null),
+  });
 
   routes.push({
     path: '/',
@@ -1114,3 +1136,28 @@ export function attachHubInventory(routes: SeoRoute[], inv: { fyi: PublicBoat[];
 // so its links and counts can't drift from the pages that exist.
 export { BRAND_PAGES, CATEGORY_PAGES, FYI_TEAM };
 export const MANUAL_LISTING_COUNT = MANUAL_LISTINGS.length;
+
+/**
+ * The landing page's header + hero as HTML the app hydrates (index.tsx), so
+ * renderToString — hydration needs its text-node markers. React also emits a
+ * <link rel=preload> for the eager logo image ahead of the markup; that node
+ * isn't part of the component tree hydration walks, so it is dropped.
+ */
+function landingShell(count: number | null): string {
+  return renderToString(createElement(LpShell, { hero: { ...CC_HERO, count } }))
+    .replace(/^(?:<link [^>]*>)+/, '');
+}
+
+/**
+ * Bake the live center console count into the landing page's trust strip —
+ * the same count the page computes on load (FYI's book plus the hand-entered
+ * listings). Left out, never guessed, when the build feed didn't answer.
+ */
+export function attachLandingShells(routes: SeoRoute[], inv: { fyi: PublicBoat[] }): number | null {
+  const r = routes.find((x) => x.path === LP_PATH);
+  if (!r || !inv.fyi.length) return null;
+  const manual = MANUAL_LISTINGS.map(normalizePublicBoat).filter((b): b is PublicBoat => b !== null);
+  const count = [...inv.fyi, ...manual].filter((b) => isCenterConsole(b.classCode)).length;
+  if (count) r.shellHtml = landingShell(count);
+  return count || null;
+}
