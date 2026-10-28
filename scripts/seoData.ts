@@ -1168,13 +1168,17 @@ export async function attachLandingShells(routes: SeoRoute[], inv: { fyi: Public
   const ownCc = own.filter((b) => isCenterConsole(b.classCode)).length;
   try {
     const page = await plsSearch({ class: 'Center Consoles', sort: 'Length|desc', rows: '24' }, { fields: 'DocumentID' });
-    if (!page.numResults) return null;
+    if (!page.numResults) {
+      console.warn(`[seoData] landing count: PLS returned no results (BOATS_PLS_API_KEY ${process.env.BOATS_PLS_API_KEY ? 'set' : 'not set'})`);
+      return null;
+    }
     const ids = new Set(own.map((b) => b.id));
     const dropped = page.results.filter((x) => ids.has(String(x.DocumentID))).length;
     const count = ownCc + page.numResults - dropped;
     r.shellHtml = landingShell(count);
     return count;
-  } catch {
+  } catch (err) {
+    console.warn(`[seoData] landing count: ${(err as Error)?.message || err}`);
     return null;
   }
 }
