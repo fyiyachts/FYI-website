@@ -79,6 +79,11 @@ const num = (v: unknown): number | undefined => {
 /** The asking price as shown, in the listing's own currency ("€845,000"). */
 const askingPrice = (b: Boat): string => formatMoney(b.listPrice, 'Price on Request');
 
+// Listing lookup: retry a failed request after 1s, then 3s. The per-attempt
+// timeout sits above the proxy's own worst case (feed + retry, PLS + retry).
+const LISTING_RETRY_DELAYS = [1000, 3000];
+const LISTING_FETCH_TIMEOUT_MS = 45_000;
+
 const stripHtml = (s: string) =>
   s.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
@@ -180,29 +185,58 @@ function EnquireModal({ boat, onClose }: { boat: Boat; onClose: () => void }) {
 export default function PublicListingPage() {
   const { id = '' } = useParams();
   const [boat, setBoat] = useState<Boat | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  // 'gone' only on a clean 200 with no such boat; 'unavailable' when the
+  // lookup failed (network, timeout, non-OK status) even after retries.
+  const [state, setState] = useState<'loading' | 'ready' | 'gone' | 'unavailable'>('loading');
+  const [reload, setReload] = useState(0);
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [enquire, setEnquire] = useState(false);
   const [shared, setShared] = useState(false);
 
+  // Never tell a visitor a live boat is gone because of an error: only a clean
+  // 200 with no results means "no longer available". Anything else — network
+  // error, timeout, 429/5xx, a body that isn't the expected JSON — is retried
+  // after 1s and 3s, then shown as a temporary problem with a Retry button.
   useEffect(() => {
     if (!id) return;
     let alive = true;
+    let ctl: AbortController | null = null;
     setState('loading');
-    fetch(`/api/yachts/proxy?documentid=${encodeURIComponent(id)}`)
-      .then((r) => r.json())
-      .then((d) => {
+    (async () => {
+      for (let attempt = 0; attempt <= LISTING_RETRY_DELAYS.length; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, LISTING_RETRY_DELAYS[attempt - 1]));
         if (!alive) return;
-        const item = Array.isArray(d?.results) ? d.results[0] : null;
-        if (!item) { setState('error'); return; }
-        const b = normalize(item);
-        setBoat(b);
-        setState('ready');
-        document.title = `${b.title} — FYI Yachts`;
-      })
-      .catch(() => { if (alive) setState('error'); });
-    return () => { alive = false; };
-  }, [id]);
+        ctl = new AbortController();
+        const timer = setTimeout(() => ctl?.abort(), LISTING_FETCH_TIMEOUT_MS);
+        try {
+          const r = await fetch(`/api/yachts/proxy?documentid=${encodeURIComponent(id)}`, { signal: ctl.signal });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = await r.json();
+          if (!d || typeof d !== 'object' || d.error) throw new Error('bad response');
+          const item = Array.isArray(d.results) ? d.results[0] : null;
+          if (!alive) return;
+          if (item) {
+            const b = normalize(item);
+            setBoat(b);
+            setState('ready');
+            document.title = `${b.title} — FYI Yachts`;
+            return;
+          }
+          if (d.numResults === 0 || d.results == null || (Array.isArray(d.results) && d.results.length === 0)) {
+            setState('gone');
+            return;
+          }
+          throw new Error('unexpected response');
+        } catch {
+          // fall through to the next attempt
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      if (alive) setState('unavailable');
+    })();
+    return () => { alive = false; ctl?.abort(); };
+  }, [id, reload]);
 
   // Co-brokerage boats: usable but not indexed (api/listing.ts sends the same
   // meta + X-Robots-Tag). Set for them, removed for every other boat — the SPA
@@ -261,7 +295,32 @@ export default function PublicListingPage() {
       </div>
     );
   }
-  if (state === 'error' || !boat) {
+  if (state === 'unavailable') {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-yacht-900 px-6 text-center">
+        <Anchor className="h-10 w-10 text-white/30" />
+        <p className="max-w-md text-lg font-light text-white/80">
+          We&rsquo;re having trouble loading this listing — please refresh in a moment.
+        </p>
+        <div className="mt-2 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setReload((n) => n + 1)}
+            className="bg-yacht-brand px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-white transition-colors hover:bg-yacht-brand-light"
+          >
+            Retry
+          </button>
+          <a
+            href="/yachts-for-sale"
+            className="border border-white/25 px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-white transition-colors hover:border-yacht-brand"
+          >
+            Browse all yachts
+          </a>
+        </div>
+      </div>
+    );
+  }
+  if (state === 'gone' || !boat) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-yacht-900 px-6 text-center">
         <Anchor className="h-10 w-10 text-white/30" />
