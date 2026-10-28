@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, MapPin, MessageCircle, Phone, Sparkles } from 'lucide-react';
 import { track } from '../../utils/analytics';
 import { useStickyCtaFlag } from '../public/useStickyCtaFlag';
-import { compareSold, soldWindowStart } from '../public/publicData';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
-import { formatMoney, listPrice } from '../../api/_lib/price';
+import { formatMoney, type Money } from '../../api/_lib/price';
+import { fetchJsonShared } from '../../utils/sharedFetch';
 
 /* ------------------------------------------------- city-level map */
 
@@ -131,65 +131,61 @@ export function AiOverview({ id }: { id: string }) {
   );
 }
 
-/* ------------------------------------------------ recently sold strip */
+/* -------------------------------- sold strip + more like this (lazy) */
 
-interface SoldPick { id: string; title: string; boatName?: string | undefined; image: string }
-let soldStripCache: SoldPick[] | null = null;
+// Both strips come from ONE small request to /api/yachts/showcase, made only
+// when either strip scrolls near the viewport. They used to pull whole
+// inventories through the proxy on every listing view (the active book, and
+// the sold book three times over), which is what tripped its per-IP limit.
 
-/** Length in feet off a raw feed row, for the largest-first ordering. */
-const lenOf = (it: any): number =>
-  parseFloat(String(it?.LengthOverall ?? it?.NominalLength ?? '').replace(/[^0-9.]/g, '')) || 0;
+interface ShowcaseCard {
+  id: string; name: string; year?: number; make?: string; model?: string;
+  lengthFt?: number; priceUsd?: number; listPrice?: Money; image?: string;
+}
+interface Showcase { similar?: ShowcaseCard[]; sold?: ShowcaseCard[] }
 
-export function RecentlySoldStrip() {
-  const [sold, setSold] = useState(soldStripCache ?? []);
+interface ListingRef { id: string; make?: string; lengthFt?: number }
+
+const showcaseUrl = ({ id, make, lengthFt }: ListingRef): string => {
+  const qs = new URLSearchParams({ sections: 'similar,sold', id });
+  if (make) qs.set('make', make);
+  if (lengthFt) qs.set('len', String(Math.round(lengthFt)));
+  return `/api/yachts/showcase?${qs.toString()}`;
+};
+
+/** Fetch the listing's showcase once its strip is within ~600px of the viewport. */
+function useListingShowcase(ref: ListingRef) {
+  const [node, setNode] = useState<HTMLElement | null>(null);
+  const [data, setData] = useState<Showcase | null>(null);
+  const url = showcaseUrl(ref);
   useEffect(() => {
-    if (soldStripCache) return;
+    if (!node) return;
     let alive = true;
-    // Same rule as the sold gallery: last 12 months first, largest to
-    // smallest, then the rest of the book. The window's boats are spread
-    // through the feed and
-    // the feed does not return newest first, so this reads all three pages —
-    // the result is module-cached, so it happens once per page load at most.
-    const PAGE = 400;
-    const page = (start: number) =>
-      fetch(`/api/yachts/proxy?salesstatus=sold&rows=${PAGE}&start=${start}`)
-        .then(r => r.json())
-        .then(d => (Array.isArray(d?.results) ? (d.results as any[]) : []))
-        .catch(() => [] as any[]);
-    Promise.all([page(0), page(PAGE), page(PAGE * 2)])
-      .then(pages => {
-        const from = soldWindowStart();
-        const seenIds = new Set<string>();
-        const items: any[] = pages.flat()
-          .filter(it => it?.DocumentID && !seenIds.has(String(it.DocumentID)) && seenIds.add(String(it.DocumentID)))
-          .sort((a, b) => compareSold(
-            { soldDate: String(a.SoldDate ?? ''), lengthFt: lenOf(a) },
-            { soldDate: String(b.SoldDate ?? ''), lengthFt: lenOf(b) },
-            from,
-          ));
-        const picks = items
-          .map(it => {
-            const img = (Array.isArray(it.Images) ? it.Images : [])
-              .map((x: any) => (typeof x === 'string' ? x : x?.Uri || ''))
-              .filter(Boolean)[0];
-            return img ? {
-              id: String(it.DocumentID),
-              title: yachtTitle(it.ModelYear, it.MakeString, it.Model) || it.BoatName || 'Sold yacht',
-              boatName: boatNameLine(it.BoatName, yachtTitle(it.ModelYear, it.MakeString, it.Model)),
-              image: optImg(img, 480),
-            } : null;
-          })
-          .flatMap((x): SoldPick[] => (x ? [x] : []))
-          .slice(0, 3);
-        soldStripCache = picks;
-        if (alive) setSold(picks);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  if (!sold.length) return null;
+    const load = () => {
+      fetchJsonShared<Showcase>(url).then((d) => { if (alive) setData(d); }).catch(() => {});
+    };
+    if (typeof IntersectionObserver === 'undefined') { load(); return () => { alive = false; }; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); load(); }
+    }, { rootMargin: '600px 0px' });
+    io.observe(node);
+    return () => { alive = false; io.disconnect(); };
+  }, [node, url]);
+  return { setNode, data };
+}
+
+const cardTitle = (c: ShowcaseCard) => yachtTitle(c.year, c.make, c.model) || c.name || 'Yacht';
+const cardName = (c: ShowcaseCard) => boatNameLine(c.name, yachtTitle(c.year, c.make, c.model));
+// Own currency ("€845,000"); USD from priceUsd when the server sent no listPrice.
+const cardPrice = (c: ShowcaseCard) =>
+  formatMoney(c.listPrice ?? (c.priceUsd ? { amount: c.priceUsd, currency: 'USD' } : undefined));
+
+export function RecentlySoldStrip(props: ListingRef) {
+  const { setNode, data } = useListingShowcase(props);
+  const sold = (data?.sold ?? []).filter((c) => c.image);
+  if (!sold.length) return <div ref={setNode} aria-hidden="true" />;
   return (
-    <section className="mt-12">
+    <section ref={setNode} className="mt-12">
       <div className="flex items-end justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-yacht-brand">Sold by FYI</p>
         <a href="/sold-yachts" className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-yacht-900/50 transition-colors hover:text-yacht-brand">
@@ -197,13 +193,13 @@ export function RecentlySoldStrip() {
         </a>
       </div>
       <div className="mt-5 grid grid-cols-3 gap-3">
-        {sold.map(b => (
-          <div key={b.id} className="relative overflow-hidden bg-white">
-            <img src={b.image} alt={`${b.title} — sold by FYI Yachts`} width={480} height={300} loading="lazy" className="aspect-[16/10] w-full object-cover saturate-[0.7]" />
+        {sold.map(c => (
+          <div key={c.id} className="relative overflow-hidden bg-white">
+            <img src={optImg(c.image, 480)} alt={`${cardTitle(c)} — sold by FYI Yachts`} width={480} height={300} loading="lazy" className="aspect-[16/10] w-full object-cover saturate-[0.7]" />
             <span className="absolute left-3 top-3 bg-yacht-brand px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">Sold</span>
             <div className="px-3 py-2.5">
-              <p className="truncate text-[12px] font-medium tracking-wide text-yacht-900">{b.title}</p>
-              {b.boatName && <p className="truncate text-[11px] font-light italic text-yacht-900/55">{b.boatName}</p>}
+              <p className="truncate text-[12px] font-medium tracking-wide text-yacht-900">{cardTitle(c)}</p>
+              {cardName(c) && <p className="truncate text-[11px] font-light italic text-yacht-900/55">{cardName(c)}</p>}
             </div>
           </div>
         ))}
@@ -212,58 +208,23 @@ export function RecentlySoldStrip() {
   );
 }
 
-/* ------------------------------------------------ more like this */
-
-// Similar active vessels — cheapest cross-sell on the site. Matches on
-// type/length band, excludes the current listing, from the live feed.
-export function MoreLikeThis({ id, make, lengthFt }: { id: string; make?: string; lengthFt?: number }) {
-  const [picks, setPicks] = useState<{ id: string; title: string; boatName?: string; image: string; price: string }[]>([]);
-  useEffect(() => {
-    let alive = true;
-    fetch('/api/yachts/proxy?salesstatus=active&rows=400')
-      .then(r => r.json())
-      .then(d => {
-        const items: any[] = Array.isArray(d?.results) ? d.results : [];
-        const band = lengthFt ? [lengthFt * 0.6, lengthFt * 1.5] : null;
-        const scored = items
-          .filter(it => String(it.DocumentID) !== id)
-          .map(it => {
-            const len = parseFloat(String(it.LengthOverall ?? it.NominalLength ?? '').replace(/[^0-9.]/g, ''));
-            const img = (Array.isArray(it.Images) ? it.Images : [])
-              .map((x: any) => (typeof x === 'string' ? x : x?.Uri || ''))
-              .filter(Boolean)[0];
-            let score = 0;
-            if (make && String(it.MakeString || '').toLowerCase() === make.toLowerCase()) score += 2;
-            if (band && Number.isFinite(len) && len >= band[0] && len <= band[1]) score += 1;
-            return { it, len, img, score };
-          })
-          .filter(x => x.img && x.score > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 3)
-          .map(x => ({
-            id: String(x.it.DocumentID),
-            title: yachtTitle(x.it.ModelYear, x.it.MakeString, x.it.Model) || x.it.BoatName || 'Yacht',
-            boatName: boatNameLine(x.it.BoatName, yachtTitle(x.it.ModelYear, x.it.MakeString, x.it.Model)),
-            image: optImg(x.img, 640),
-            price: formatMoney(listPrice(x.it)), // own currency: "€845,000"
-          }));
-        if (alive) setPicks(scored);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [id, make, lengthFt]);
-  if (picks.length < 2) return null;
+// Similar active vessels — cheapest cross-sell on the site. Matches on make
+// and length band, excludes the current listing (scored server-side).
+export function MoreLikeThis(props: ListingRef) {
+  const { setNode, data } = useListingShowcase(props);
+  const picks = (data?.similar ?? []).filter((c) => c.image);
+  if (picks.length < 2) return <div ref={setNode} aria-hidden="true" />;
   return (
-    <section className="mt-12">
+    <section ref={setNode} className="mt-12">
       <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-yacht-brand">More Like This</p>
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {picks.map(b => (
-          <a key={b.id} href={`/listing/${b.id}`} className="group block overflow-hidden bg-white shadow-sm transition-shadow hover:shadow-md">
-            <img src={b.image} alt={b.title} width={640} height={480} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        {picks.map(c => (
+          <a key={c.id} href={`/listing/${c.id}`} className="group block overflow-hidden bg-white shadow-sm transition-shadow hover:shadow-md">
+            <img src={optImg(c.image, 640)} alt={cardTitle(c)} width={640} height={480} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
             <div className="p-4">
-              <h3 className="truncate text-[14px] font-medium tracking-wide text-yacht-900">{b.title}</h3>
-              {b.boatName && <p className="truncate text-[12px] font-light italic text-yacht-900/55">{b.boatName}</p>}
-              <p className="mt-1 text-[13px] font-semibold text-yacht-900/80">{b.price}</p>
+              <h3 className="truncate text-[14px] font-medium tracking-wide text-yacht-900">{cardTitle(c)}</h3>
+              {cardName(c) && <p className="truncate text-[12px] font-light italic text-yacht-900/55">{cardName(c)}</p>}
+              <p className="mt-1 text-[13px] font-semibold text-yacht-900/80">{cardPrice(c)}</p>
             </div>
           </a>
         ))}
