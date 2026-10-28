@@ -12,6 +12,7 @@ import { Breadcrumbs } from '../public/Breadcrumbs';
 import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track } from '../../utils/analytics';
 import { optImg, srcSet } from '../../utils/img';
+import { countryName } from '../../api/_lib/countryName';
 
 /** Hero photo widths and layout size; api/listing.ts preloads the same pair. */
 const HERO_WIDTHS = [640, 960, 1280, 1600];
@@ -125,7 +126,7 @@ function normalize(it: any): Boat {
     fuelCap: cap(it.FuelTankCapacityMeasure),
     waterCap: cap(it.WaterTankCapacityMeasure),
     holdingCap: cap(it.HoldingTankCapacityMeasure),
-    location: [loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : null, loc.BoatStateCode || loc.BoatCountryID]
+    location: [loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : null, loc.BoatStateCode || countryName(loc.BoatCountryID)]
       .filter(Boolean).join(', ') || undefined,
     images: images.slice(0, 30),
     description: typeof it.GeneralBoatDescription === 'string' ? stripHtml(it.GeneralBoatDescription) : undefined,

@@ -1,6 +1,6 @@
 // Hand-entered sale listings that are NOT in FYI's BoatsGroup feed (client,
-// 2026-10-01 — two central-agency boats FYI is marketing from the brokers'
-// own brochures). Each record is shaped like a raw boats.com feed item so
+// 2026-10-01 — central-agency boats FYI is marketing from the brokers' own
+// brochures; ANIM added 2026-10-28). Each record is shaped like a raw boats.com feed item so
 // every consumer that already parses the feed (the /api/yachts/proxy grids,
 // search, the listing page, /api/listing's server render) handles it with no
 // extra code. DocumentIDs sit in the 99,000,000 range, far above anything
@@ -108,6 +108,50 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     GeneralBoatDescription:
       'MANTA is a Sunreef 80 Power catamaran — 23.87 m (78′4″) overall with a 12 m (39′4″) beam — built in infused E-glass sandwich composite to CE Category A, and adapted to the Malta Commercial Code (Sea Area 2) for charter. Her galley-up layout leaves the lower hulls to a VIP cabin and three further guest cabins, with two crew cabins forward. Twin 1,200 hp MAN engines and 16,000 L of fuel give her real range, and the extras list is long: a 1,200 kg hydraulic platform, a garage for water toys with a jet-ski launching system, a Williams 520 Carbon tender, a 2021 Sea-Doo GTX 230, and attachments for Seabobs and a Radinn e-surf board. Key features: Galley up, VIP cabin, 3 guest cabins, 2 crew cabins · Composite flybridge hardtop with skylights · Hydraulic swim platform (1,200 kg) and toy garage · 84 kWh lithium night-mode battery bank with inverter · Additional 280 L/h watermaker · KVH TV6 satellite TV, Cobham Fleet Xpress, Pepwave 4G · Lumishore underwater lights · Malta Commercial Code 2015, Sea Area 2. Main data — Construction: composite (E-glass sandwich, infusion; vinylester osmosis barrier) · Naval architecture: Sunreef Yachts · Category A · LOA 23.87 m · Beam 12 m · Draft 2.2 m · Water 1,600 L · Fuel 2 × 8,000 L · Engines 2 × 1,200 hp MAN · Malta Commercial Code, Sea Area 2 Machinery — Twin MAN 1,200 hp with stainless shafts and rope cutters · Controls on flybridge and in saloon · Bow thruster · Engine-room sound insulation · Anti-vibration thrust bearings Deck equipment — Hydraulic gangway · Four-sided flybridge windscreen · Jet-ski launching system · Cockpit shower · Two aft capstans · Additional 2 × electric bow winches · Pantograph electric doors to the front deck Comfort on board — 120,000 BTU/h air conditioning · Miele galley, washer and dryer · Saloon wine cooler · 55″ lifting TV and Yamaha 7.2 home cinema · 6 × 32″ cabin TVs · Cockpit bar and flybridge bar with ice makers and electric BBQ · Diving compressor · Electric saloon blinds · Extra freezers in the bilge Electrical — 84 kWh 25.6 V lithium night-mode bank with 230 V inverter · 2 × 28 kVA paralleling generators · 2 × 63 A shore inlets Safety — Full rescue equipment with life rafts for 12 · 3,000 W windlass · Mooring set Extras — Williams 520 Carbon tender · Sea-Doo GTX 230 (2021) · KVH TV6 · Cobham Sailor GX60 / Fleet Broadband 250 / Fleet Xpress · Kerio NG310 · Cisco Wi-Fi · Pepwave MAX BR1 4G · Poliform and Dedon furniture · Yacht Controller · Lumishore underwater lights · Seabob and e-surf attachments in the garage · Delivered with full fuel tanks Specifications are provided for general information; buyers are encouraged to inspect the boat or request verification before purchase.',
     Images: imgs('manta', 31, 'Sunreef 80 Power catamaran MANTA'),
+  },
+  {
+    // Source: "RIVA 100 CORSARO ANIM FY.pdf" (central agent brochure, Favia
+    // Yachting). The brochure gives no city, engine hours, cruise speed or
+    // range, so none is published.
+    Source: 'FYI-MANUAL',
+    DocumentID: '99000003',
+    SalesStatus: 'Active',
+    CompanyName: 'FYI Yachts',
+    Office: OFFICE,
+    LastModificationDate: '2026-10-28',
+    ItemReceivedDate: '2026-10-28',
+    Price: '7900000 USD',
+    PriceHideInd: false,
+    BoatLocation: { BoatCountryID: 'TR' },
+    MakeString: 'Riva',
+    ModelYear: 2019,
+    SaleClassCode: 'Used',
+    Model: '100 Corsaro',
+    BoatCategoryCode: 'Power',
+    BoatName: 'ANIM',
+    MaximumSpeedMeasure: '27.5 kn',
+    BeamMeasure: '22 ft',
+    MaxDraft: '7.42 ft',
+    DisplacementMeasure: '242509 lb',
+    FuelTankCapacityMeasure: '2378|gallon',
+    WaterTankCapacityMeasure: '349|gallon',
+    HoldingTankCapacityMeasure: '111|gallon',
+    TotalEnginePowerQuantity: '5,276 hp',
+    DriveTypeCode: 'Shaft Drive',
+    HeadsCountNumeric: 6,
+    CabinsCountNumeric: 5,
+    MaximumNumberOfPassengersNumeric: 10,
+    NominalLength: '100 ft',
+    LengthOverall: '100 ft',
+    Engines: [
+      { Make: 'MTU', Model: '16V 2000 M96L', Fuel: 'diesel', EnginePower: '2638|horsepower', Type: 'Inboard' },
+      { Make: 'MTU', Model: '16V 2000 M96L', Fuel: 'diesel', EnginePower: '2638|horsepower', Type: 'Inboard' },
+    ],
+    BoatClassCode: ['Flybridge', 'Motor Yachts'],
+    // Plain text: the listing page renders this field stripped of HTML.
+    GeneralBoatDescription:
+      'The 100′ Riva Corsaro is a modern classic of Italian design, engineering and craftsmanship, blending performance, luxury and seaworthiness with the heritage of the Riva name. Key data — LOA 100 ft · Beam 22 ft · Draft 7′5″ · Weight 242,509 lb · Max 27.5 kn · 2 × MTU 16V 2000 M96L, 2,638 hp each, shaft drive Tankage — Fuel 9,000 L · Water 1,320 L · Black water 420 L · Grey water 330 L Accommodation — 5 cabins for 10 guests · 6 heads · 3 crew cabins for 5 crew Equipment — Dual 15″ Furuno NavNet 3D displays · Furuno radar and AIS · Simrad autopilot and VHF · CCTV · Chilled-water Condaria A/C throughout with individual cabin control · Samsung Smart TVs in salon and all cabins · Fusion audio with Yamaha amplifiers · Mastervolt inverter/chargers · 230V shore power with Glendinning Cablemaster · Integrated monitoring and control system · Bow and stern thrusters with remotes · Wind station, depth sounder, digital compass · Cockpit docking station · Flybridge helm with full navigation and engine instrumentation. Particulars given in good faith but not guaranteed.',
+    Images: imgs('anim', 20, '2019 Riva 100 Corsaro ANIM'),
   },
 ];
 
