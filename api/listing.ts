@@ -9,6 +9,7 @@
 import { INDEX_SHELL } from './_lib/indexShell.js';
 import { findManualListing } from './_lib/manualListings.js';
 import { plsGetById } from './_lib/plsFeed.js';
+import { countryName } from './_lib/countryName.js';
 
 type VercelRequest = { query: Record<string, string | string[]>; method?: string };
 type VercelResponse = {
@@ -117,7 +118,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const price = it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price);
     const lengthFt = num(it.LengthOverall ?? it.NominalLength);
     const city = loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : undefined;
-    const region = [city, loc.BoatStateCode].filter(Boolean).join(', ');
+    // Country spelled out when there is no US state ("Turkey", not "TR"),
+    // matching the listing page.
+    const region = [city, loc.BoatStateCode || countryName(loc.BoatCountryID)].filter(Boolean).join(', ');
     const images: string[] = Array.isArray(it.Images)
       ? it.Images.map((x: any) => (typeof x === 'string' ? x : x?.Uri || x?.url || ''))
           .filter(Boolean)
