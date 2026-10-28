@@ -32,7 +32,7 @@ export function useFormGuard(): FormGuard {
   // useRef, not useState: the timestamp is captured once on mount and must not
   // move when the component re-renders as the visitor types.
   const openedAt = useRef(Date.now());
-  return { company, setCompany, formOpenedAt: openedAt.current, fieldId: `${useId()}company` };
+  return { company, setCompany, formOpenedAt: openedAt.current, fieldId: `${useId()}hp` };
 }
 
 /** Spread into a lead request body alongside name/email/message. */
@@ -44,17 +44,28 @@ export function guardFields(g: FormGuard): { company: string; formOpenedAt: numb
  * The honeypot input. Taken out of the visual and accessibility trees without
  * `display:none` — some bots skip hidden inputs, but few compute layout — and
  * out of the tab order, so a keyboard user never lands on it either.
+ *
+ * Nothing about it may look like a real field to browser autofill or a
+ * password manager. It used to be name="company" / label "Company": Chrome
+ * filled it with the visitor's organization along with their name, email and
+ * phone, and the lead was dropped as a bot (a real test lead, 2026-10-28).
+ * autocomplete="off" doesn't stop that, so the name and label carry no
+ * meaning and the password-manager opt-outs are set. The request field stays
+ * `company` (guardFields) — only the markup changed.
  */
 export function HoneypotField({ guard }: { guard: FormGuard }) {
   return (
     <div className="absolute -left-[9999px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
-      <label htmlFor={guard.fieldId}>Company</label>
+      <label htmlFor={guard.fieldId}>Leave this field empty</label>
       <input
         id={guard.fieldId}
-        name="company"
+        name="hp_check_7f"
         type="text"
         tabIndex={-1}
         autoComplete="off"
+        data-1p-ignore=""
+        data-lpignore="true"
+        data-form-type="other"
         value={guard.company}
         onChange={(e) => guard.setCompany(e.target.value)}
       />

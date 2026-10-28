@@ -133,7 +133,7 @@ export default function QuickForm({
         {field('email', 'Email', 'email', 'email', 'email')}
         {field('phone', 'Phone', 'tel', 'tel', 'tel')}
       </div>
-      <HoneypotField guard={{ company, setCompany, formOpenedAt: openedAt.current, fieldId: id('company') }} />
+      <HoneypotField guard={{ company, setCompany, formOpenedAt: openedAt.current, fieldId: id('hp') }} />
       <button type="submit" disabled={status === 'sending'} className={`${SUBMIT_CLS} mt-5 sm:mt-6`}>
         {status === 'sending' ? 'Sending…' : 'Get matched'}
       </button>
