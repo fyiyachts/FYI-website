@@ -5,7 +5,7 @@ import { fetchYachtInventory } from '../../services/databaseService';
 import { yachtListingToPineconeBoat } from '../../utils/yachtAdapter';
 import type { PineconeBoat } from '../../types/search';
 import type { SavedBoat } from '../../types/user';
-import { formatPrice } from '../../utils/formatters';
+import { formatBoatPrice } from '../../utils/formatters';
 import SaveButton from '../saved/SaveButton';
 import CompareButton from '../compare/CompareButton';
 import { Sparkles, Loader2, MapPin, Ruler, Calendar, Search, ChevronRight, Heart } from 'lucide-react';
@@ -289,7 +289,7 @@ export default function ForYouPage() {
                     <h3 className={`text-white font-medium text-sm line-clamp-1 ${nameLine ? '' : 'mb-1'}`}>{title}</h3>
                     {nameLine && <p className="mb-1 truncate text-xs font-light italic text-white/50">{nameLine}</p>}
                     <p className="text-yacht-cream font-bold text-lg">
-                      {boat.price ? formatPrice(boat.price) : 'Price on Request'}
+                      {formatBoatPrice(boat)}
                     </p>
                     <div className="flex items-center gap-3 mt-2 text-white/40 text-xs">
                       {boat.length && (

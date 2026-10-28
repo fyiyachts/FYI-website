@@ -9,6 +9,7 @@ import { usePageMeta } from '../../utils/usePageMeta';
 import { PublicInquiryForm } from './PublicPages';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
+import { formatMoney, type Money } from '../../api/_lib/price';
 
 /**
  * Public team pages in the new-site design system, mirroring fyiyachts.com's
@@ -26,6 +27,8 @@ interface RepBoat {
   year?: number;
   lengthFt?: number;
   priceUsd?: number;
+  /** Asking price in the listing's own currency (shown); priceUsd is the USD equivalent. */
+  listPrice?: Money;
   city?: string;
   state?: string;
   country?: string;
@@ -132,6 +135,7 @@ function RepBoatCard({ boat, sold }: { boat: RepBoat; sold?: boolean }) {
   const image = boat.image ? optImg(boat.image, 640) : undefined;
   // `name` is the boat's given name, or year/make/model when it has none.
   const title = yachtTitle(boat.year, boat.make, boat.model) || boat.name;
+  const priceText = boat.listPrice ? formatMoney(boat.listPrice) : usd(boat.priceUsd);
   const boatName = boatNameLine(boat.name, title);
   const body = (
     <>
@@ -157,7 +161,7 @@ function RepBoatCard({ boat, sold }: { boat: RepBoat; sold?: boolean }) {
             {boat.city ? (<><MapPin className="h-3.5 w-3.5 shrink-0" />{[boat.city, boat.state || boat.country].filter(Boolean).join(', ')}</>) : (boat.model || '')}
           </span>
           <span className={`shrink-0 text-sm font-semibold ${sold ? 'text-yacht-900/45' : 'text-yacht-900'}`}>
-            {sold ? (boat.priceUsd ? `Listed ${usd(boat.priceUsd)}` : 'Sold') : usd(boat.priceUsd)}
+            {sold ? (boat.priceUsd ? `Listed ${priceText}` : 'Sold') : priceText}
           </span>
         </div>
       </div>

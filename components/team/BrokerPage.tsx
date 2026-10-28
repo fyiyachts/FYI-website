@@ -5,6 +5,7 @@ import { memberBySlug, telHref } from './fyiTeam';
 import { BrokerAvatar } from './TeamPage';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
+import { formatMoney, type Money } from '../../api/_lib/price';
 
 const GOLD = '#D4AF37';
 
@@ -16,6 +17,8 @@ interface BrokerBoat {
   year?: number;
   lengthFt?: number;
   priceUsd?: number;
+  /** Asking price in the listing's own currency (shown); priceUsd is the USD equivalent. */
+  listPrice?: Money;
   city?: string;
   state?: string;
   country?: string;
@@ -32,6 +35,7 @@ function BoatCard({ boat, sold }: { boat: BrokerBoat; sold?: boolean }) {
   // `name` from the feed is the boat's given name, or year/make/model when it
   // has none — so it is the secondary line only when it says something new.
   const title = yachtTitle(boat.year, boat.make, boat.model) || boat.name;
+  const priceText = boat.listPrice ? formatMoney(boat.listPrice) : usd(boat.priceUsd);
   const boatName = boatNameLine(boat.name, title);
   const meta = [
     boat.lengthFt ? `${Math.round(boat.lengthFt)} ft` : null,
@@ -56,7 +60,7 @@ function BoatCard({ boat, sold }: { boat: BrokerBoat; sold?: boolean }) {
         <p className="truncate text-[13px] font-semibold text-yacht-900">{title}</p>
         {boatName && <p className="truncate text-[12px] font-light italic text-slate-500">{boatName}</p>}
         <p className="text-[13px] font-bold" style={{ color: sold ? '#64748b' : '#9d7413' }}>
-          {sold ? (boat.priceUsd != null ? `Listed at ${usd(boat.priceUsd)}` : 'Sold') : usd(boat.priceUsd)}
+          {sold ? (boat.priceUsd != null ? `Listed at ${priceText}` : 'Sold') : priceText}
         </p>
         {meta && <p className="truncate text-[11.5px] text-slate-500">{meta}</p>}
       </div>

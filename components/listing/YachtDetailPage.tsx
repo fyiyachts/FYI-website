@@ -4,7 +4,7 @@ import { searchPinecone, findSimilarYachts } from '../../services/pineconeServic
 import { fetchYachtById } from '../../services/databaseService';
 import { yachtListingToPineconeBoat } from '../../utils/yachtAdapter';
 import { addRecentlyViewed, addPriceSnapshot } from '../../services/storageService';
-import { formatPrice } from '../../utils/formatters';
+import { formatBoatPrice } from '../../utils/formatters';
 import type { YachtListing } from '../../types/yacht';
 import type { PineconeBoat } from '../../types/search';
 import ImageGallery from './ImageGallery';
@@ -27,7 +27,7 @@ function toYachtListing(boat: PineconeBoat): YachtListing {
     id: Number(boat.documentId) || 0,
     title,
     permalink: boat.listingUrl || '',
-    price: boat.price ? formatPrice(boat.price) : 'Price on Request',
+    price: formatBoatPrice(boat),
     image: boat.images?.[0] || '',
     location,
     companyName: boat.companyName || '',

@@ -5,6 +5,7 @@ import { useStickyCtaFlag } from '../public/useStickyCtaFlag';
 import { compareSold, soldWindowStart } from '../public/publicData';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
+import { formatMoney, listPrice } from '../../api/_lib/price';
 
 /* ------------------------------------------------- city-level map */
 
@@ -234,8 +235,7 @@ export function MoreLikeThis({ id, make, lengthFt }: { id: string; make?: string
             let score = 0;
             if (make && String(it.MakeString || '').toLowerCase() === make.toLowerCase()) score += 2;
             if (band && Number.isFinite(len) && len >= band[0] && len <= band[1]) score += 1;
-            const price = it.PriceHideInd ? undefined : Number(String(it.NormPrice ?? it.Price).replace(/[^0-9.]/g, ''));
-            return { it, len, img, score, price };
+            return { it, len, img, score };
           })
           .filter(x => x.img && x.score > 0)
           .sort((a, b) => b.score - a.score)
@@ -245,7 +245,7 @@ export function MoreLikeThis({ id, make, lengthFt }: { id: string; make?: string
             title: yachtTitle(x.it.ModelYear, x.it.MakeString, x.it.Model) || x.it.BoatName || 'Yacht',
             boatName: boatNameLine(x.it.BoatName, yachtTitle(x.it.ModelYear, x.it.MakeString, x.it.Model)),
             image: optImg(x.img, 640),
-            price: x.price && x.price > 0 ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(x.price) : 'Price on request',
+            price: formatMoney(listPrice(x.it)), // own currency: "€845,000"
           }));
         if (alive) setPicks(scored);
       })

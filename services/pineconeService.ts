@@ -1,4 +1,5 @@
 import type { PineconeBoat, PineconeStructuredFilters, SmartQueryIntent } from '../types/search';
+import { listPrice, usdEquivalent } from '../api/_lib/price';
 
 function parseLocation(raw: any): PineconeBoat['location'] {
   if (!raw) return {};
@@ -187,7 +188,9 @@ function feedRecordToBoat(it: Record<string, any>): PineconeBoat {
     model: it.Model || undefined,
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
     length: numFrom(it.LengthOverall ?? it.NominalLength),
-    price: it.PriceHideInd ? undefined : numFrom(it.Price ?? it.NormPrice),
+    // USD equivalent for sorting/filters; listPrice keeps the record's own currency.
+    price: usdEquivalent(it),
+    listPrice: listPrice(it),
     category: it.BoatCategoryCode || undefined,
     classCode,
     hullMaterial: it.BoatHullMaterialCode || undefined,

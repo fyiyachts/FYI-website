@@ -13,6 +13,7 @@ import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track } from '../../utils/analytics';
 import { optImg, srcSet } from '../../utils/img';
 import { countryName } from '../../api/_lib/countryName';
+import { formatMoney, listPrice, usdEquivalent, type Money } from '../../api/_lib/price';
 
 /** Hero photo widths and layout size; api/listing.ts preloads the same pair. */
 const HERO_WIDTHS = [640, 960, 1280, 1600];
@@ -33,7 +34,10 @@ interface Boat {
   id: string;
   title: string;
   boatName?: string;
+  /** USD-equivalent asking price (NormPrice) — finance calculator only. */
   price?: number;
+  /** Asking price in the listing's own currency — what the page displays. */
+  listPrice?: Money;
   year?: number;
   make?: string;
   model?: string;
@@ -72,10 +76,8 @@ const num = (v: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const usd = (n?: number) =>
-  n != null && n > 0
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
-    : 'Price on Request';
+/** The asking price as shown, in the listing's own currency ("€845,000"). */
+const askingPrice = (b: Boat): string => formatMoney(b.listPrice, 'Price on Request');
 
 const stripHtml = (s: string) =>
   s.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
@@ -101,7 +103,8 @@ function normalize(it: any): Boat {
     listingType: it.ListingType || undefined,
     title,
     boatName: it.BoatName || undefined,
-    price: it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price),
+    price: usdEquivalent(it),
+    listPrice: listPrice(it),
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
     make: it.MakeString || undefined,
     model: it.Model || undefined,
@@ -220,7 +223,7 @@ export default function PublicListingPage() {
   // Product markup only for priced listings with a photo: without an offer
   // (or the reviews listings never have) Google flags the Product as an
   // invalid item in Search Console instead of showing a rich result.
-  useJsonLd('listing', useMemo(() => boat && boat.price && boat.images[0] ? {
+  useJsonLd('listing', useMemo(() => boat && boat.listPrice && boat.images[0] ? {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: boat.title,
@@ -229,8 +232,8 @@ export default function PublicListingPage() {
     brand: boat.make ? { '@type': 'Brand', name: boat.make } : undefined,
     offers: {
       '@type': 'Offer',
-      price: boat.price,
-      priceCurrency: 'USD',
+      price: boat.listPrice.amount,
+      priceCurrency: boat.listPrice.currency,
       availability: 'https://schema.org/InStock',
       itemCondition: (boat.condition || '').toLowerCase() === 'new'
         ? 'https://schema.org/NewCondition' : 'https://schema.org/UsedCondition',
@@ -366,7 +369,7 @@ export default function PublicListingPage() {
           <SpecSection
             heading="Specifications"
             rows={[
-              ['Asking Price', usd(boat.price)],
+              ['Asking Price', askingPrice(boat)],
               ['Length', metric],
               ['Beam', boat.beam],
               ['Draft', boat.draft],
@@ -412,7 +415,7 @@ export default function PublicListingPage() {
               tone="light"
               yacht={{
                 title: boat.title,
-                price: usd(boat.price),
+                price: askingPrice(boat),
                 year: boat.year ? String(boat.year) : undefined,
                 make: boat.make,
                 model: boat.model,
@@ -448,7 +451,7 @@ export default function PublicListingPage() {
               {boat.location ? ` · ${boat.location}` : ''}
             </p>
             <p className="mt-5 border-t border-yacht-900/10 pt-5 text-[14px] font-light text-yacht-900/60">
-              Asking Price: <span className="text-xl font-semibold tracking-wide text-yacht-900">{usd(boat.price)}</span>
+              Asking Price: <span className="text-xl font-semibold tracking-wide text-yacht-900">{askingPrice(boat)}</span>
             </p>
             {/* PLS courtesy line ("…centrally listed by …"): its own line by the price so it is seen at first glance. */}
             {boat.listingType === 'cobrokerage' && boat.courtesy && (
@@ -484,7 +487,7 @@ export default function PublicListingPage() {
 
       <HomeFooter />
       <div className="h-16 lg:hidden" />
-      <StickyMobileCta price={usd(boat.price)} context={boat.title} />
+      <StickyMobileCta price={askingPrice(boat)} context={boat.title} />
       <BriannaWidget />
 
       {lightbox !== null && (

@@ -10,6 +10,7 @@ import { INDEX_SHELL } from './_lib/indexShell.js';
 import { findManualListing } from './_lib/manualListings.js';
 import { plsGetById } from './_lib/plsFeed.js';
 import { countryName } from './_lib/countryName.js';
+import { formatMoney, listPrice } from './_lib/price.js';
 
 type VercelRequest = { query: Record<string, string | string[]>; method?: string };
 type VercelResponse = {
@@ -31,8 +32,6 @@ const num = (v: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const usd = (n?: number): string =>
-  n && n > 0 ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n) : 'Price on Request';
 
 // A boat that is gone (sold, withdrawn, never existed) must return a real 404.
 // This used to send the bare shell with a 200 — homepage title, no canonical,
@@ -115,7 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const loc = it.BoatLocation || {};
     const title = it.BoatName || [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ').trim() || 'Yacht';
-    const price = it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price);
+    // Shown and marked up in the listing's own currency ("€845,000", EUR).
+    const price = listPrice(it);
+    const priceText = formatMoney(price, 'Price on Request');
     const lengthFt = num(it.LengthOverall ?? it.NominalLength);
     const city = loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : undefined;
     // Country spelled out when there is no US state ("Turkey", not "TR"),
@@ -141,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const desc = typeof it.GeneralBoatDescription === 'string'
       ? it.GeneralBoatDescription.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
       : '';
-    const metaDesc = (desc.slice(0, 155) || `${title} for sale with FYI Yachts (Florida Yachts International) in Miami. ${usd(price)}${region ? ` · ${region}` : ''}.`).trim();
+    const metaDesc = (desc.slice(0, 155) || `${title} for sale with FYI Yachts (Florida Yachts International) in Miami. ${priceText}${region ? ` · ${region}` : ''}.`).trim();
     const pageTitle = `${title} for Sale | FYI Yachts`;
     // No trailing slash: vercel.json trailingSlash:false serves the bare form
     // and 308s the slashed one, so a slashed canonical points every listing at
@@ -178,7 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...(desc ? { description: desc.slice(0, 500) } : {}),
         ...(it.MakeString ? { brand: { '@type': 'Brand', name: it.MakeString } } : {}),
         offers: {
-          '@type': 'Offer', price, priceCurrency: 'USD',
+          '@type': 'Offer', price: price.amount, priceCurrency: price.currency,
           availability: 'https://schema.org/InStock',
           itemCondition: condition,
           url: canonical,
@@ -217,7 +218,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 <p class="text-[11px] font-semibold uppercase tracking-[0.35em] text-yacht-teal">FYI Yachts \u00b7 Yacht for Sale</p>
 <h1 class="mt-3 text-3xl font-light leading-snug tracking-wide text-white">${esc(title)}</h1>
 ${region ? `<p class="mt-2 text-sm font-light text-white/60">${esc(region)}</p>` : ''}
-<p class="mt-4 text-2xl font-light text-white">${esc(usd(price))}</p>
+<p class="mt-4 text-2xl font-light text-white">${esc(priceText)}</p>
 </div></header>
 <main class="mx-auto max-w-3xl px-6 py-10">
 ${specs.length ? `<dl>${specs.map(([k, v]) => `<div class="flex justify-between border-b border-yacht-900/10 py-3 text-[14px]"><dt class="font-light text-yacht-900/55">${esc(k)}</dt><dd class="font-medium text-yacht-900">${esc(v)}</dd></div>`).join('')}</dl>` : ''}

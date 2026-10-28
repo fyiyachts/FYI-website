@@ -22,6 +22,7 @@ import FYILogo from '../layout/FYILogo';
 import BriannaWidget from '../chat/BriannaWidget';
 import { optImg, srcSet } from '../../utils/img';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { formatMoney, listPrice, usdEquivalent } from '../../api/_lib/price';
 import { track as trackEvent } from '../../utils/analytics';
 import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
@@ -163,7 +164,10 @@ interface FleetCard {
   builder: string;
   length: string;
   year: number | string;
+  /** Display price in the listing's own currency ("$5,990,000", "€845,000"). */
   price: string;
+  /** USD-equivalent (NormPrice) for ordering — never parse `price`, which may be euros. */
+  priceUsd?: number;
   image: string;
 }
 
@@ -228,8 +232,10 @@ const FALLBACK_FLEET: FleetCard[] = [
   },
 ];
 
-const formatPrice = (n?: number): string =>
-  n && Number.isFinite(n) ? `$${Math.round(n).toLocaleString('en-US')}` : 'Price on request';
+// Order by the USD equivalent; the fallback cards are all USD, so their
+// display string parses to the same number.
+const fleetPriceUsd = (c: FleetCard): number =>
+  c.priceUsd ?? (parseFloat(c.price.replace(/[^0-9.]/g, '')) || 0);
 
 /** Map a raw BoatsGroup feed item (see api/yachts/proxy.ts) to a fleet card. */
 /** First raw (un-resized) photo URL on a feed item, or '' if it has none. */
@@ -248,7 +254,6 @@ function toFleetCard(it: Record<string, any>): FleetCard | null {
   if (!id || !images[0]) return null;
   const lengthFt = parseFloat(String(it.LengthOverall ?? it.NominalLength ?? '').replace(/[^0-9.]/g, ''));
   const builder = [it.MakeString, it.Model].filter(Boolean).join(' ').trim();
-  const priceNum = it.PriceHideInd ? undefined : parseFloat(String(it.NormPrice ?? it.Price ?? '').replace(/[^0-9.]/g, ''));
   const title = yachtTitle(it.ModelYear, it.MakeString, it.Model);
   return {
     id,
@@ -257,7 +262,8 @@ function toFleetCard(it: Record<string, any>): FleetCard | null {
     builder: builder || 'FYI Yachts Listing',
     length: Number.isFinite(lengthFt) ? `${Math.round(lengthFt)}'` : '—',
     year: it.ModelYear || '—',
-    price: formatPrice(priceNum),
+    price: formatMoney(listPrice(it)),
+    priceUsd: usdEquivalent(it) ?? 0,
     image: resizeBG(images[0], 900, 675),
   };
 }
@@ -455,7 +461,7 @@ function fetchTopPicks(): Promise<TopPick[]> {
         // request" and parse to 0, so they sort out of the top naturally.
         .map(it => ({ it, c: toFleetCard(it) }))
         .filter((x): x is { it: any; c: FleetCard } => x.c !== null)
-        .map(x => ({ ...x, num: parseFloat(x.c.price.replace(/[^0-9.]/g, '')) || 0 }))
+        .map(x => ({ ...x, num: fleetPriceUsd(x.c) }))
         .filter(x => x.num > 0)
         .sort((a, b) => b.num - a.num)
         .slice(0, TOP_PICK_COUNT)
@@ -1680,10 +1686,7 @@ function FeaturedFleet() {
           (c) => `${c.builder}|${c.boatName ?? ''}|${c.length}|${c.price}`,
           (c) => Number(c.year),
         )
-          .sort((a, b) => {
-            const num = (c: FleetCard) => parseFloat(c.price.replace(/[^0-9.]/g, '')) || 0;
-            return num(b) - num(a);
-          })
+          .sort((a, b) => fleetPriceUsd(b) - fleetPriceUsd(a))
           .slice(0, 16);
         if (cards.length >= 3) setFleet(cards);
       } catch {

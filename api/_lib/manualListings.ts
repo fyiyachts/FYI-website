@@ -1,6 +1,6 @@
 // Hand-entered sale listings that are NOT in FYI's BoatsGroup feed (client,
 // 2026-10-01 — central-agency boats FYI is marketing from the brokers' own
-// brochures; ANIM added 2026-10-28). Each record is shaped like a raw boats.com feed item so
+// brochures; ANIM and the Alium 42 added 2026-10-28). Each record is shaped like a raw boats.com feed item so
 // every consumer that already parses the feed (the /api/yachts/proxy grids,
 // search, the listing page, /api/listing's server render) handles it with no
 // extra code. DocumentIDs sit in the 99,000,000 range, far above anything
@@ -9,9 +9,11 @@
 // To retire one: delete its record. To add one: copy a record, give it the
 // next 990000xx id, and drop its photos into public/listings/<slug>/.
 //
-// Prices: the site formats every price as USD. A non-USD asking price is
-// therefore published as "Price on Request" (PriceHideInd) and quoted in its
-// own currency at the top of the description, rather than mislabelled with $.
+// Prices: Price carries the amount and its currency ("845000 EUR"), and the
+// site shows it in that currency (api/_lib/price.ts). A non-USD boat also
+// needs NormPrice, its USD equivalent, so it sorts and filters in the right
+// place; the rate used belongs in a comment on the record. PANAME's euro price
+// is hidden by choice and quoted in its description instead.
 
 const OFFICE = {
   PostalAddress: '2424 Coral Way', City: 'Miami', State: 'FL', PostCode: '33145',
@@ -152,6 +154,52 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     GeneralBoatDescription:
       'The 100′ Riva Corsaro is a modern classic of Italian design, engineering and craftsmanship, blending performance, luxury and seaworthiness with the heritage of the Riva name. Key data — LOA 100 ft · Beam 22 ft · Draft 7′5″ · Weight 242,509 lb · Max 27.5 kn · 2 × MTU 16V 2000 M96L, 2,638 hp each, shaft drive Tankage — Fuel 9,000 L · Water 1,320 L · Black water 420 L · Grey water 330 L Accommodation — 5 cabins for 10 guests · 6 heads · 3 crew cabins for 5 crew Equipment — Dual 15″ Furuno NavNet 3D displays · Furuno radar and AIS · Simrad autopilot and VHF · CCTV · Chilled-water Condaria A/C throughout with individual cabin control · Samsung Smart TVs in salon and all cabins · Fusion audio with Yamaha amplifiers · Mastervolt inverter/chargers · 230V shore power with Glendinning Cablemaster · Integrated monitoring and control system · Bow and stern thrusters with remotes · Wind station, depth sounder, digital compass · Cockpit docking station · Flybridge helm with full navigation and engine instrumentation. Particulars given in good faith but not guaranteed.',
     Images: imgs('anim', 20, '2019 Riva 100 Corsaro ANIM'),
+  },
+  {
+    // Source: "2027 ALIUM 42 T-Top Shiny Silver.pdf" (builder brochure, Alium
+    // Yachts). Priced in euros: shown as €845,000 everywhere (api/_lib/price.ts).
+    Source: 'FYI-MANUAL',
+    DocumentID: '99000004',
+    SalesStatus: 'Active',
+    CompanyName: 'FYI Yachts',
+    Office: OFFICE,
+    LastModificationDate: '2026-10-28',
+    ItemReceivedDate: '2026-10-28',
+    Price: '845000 EUR',
+    // USD equivalent for sorting and price filters only, never displayed:
+    // 845,000 × 1.1136 (EUR→USD mid-market, Xe, 2026-10-27 19:11 UTC).
+    NormPrice: 940992,
+    PriceHideInd: false,
+    BoatLocation: { BoatCityName: 'Cannes', BoatCountryID: 'FR' },
+    MakeString: 'Alium',
+    ModelYear: 2027,
+    SaleClassCode: 'New',
+    Model: '42 T-Top',
+    BoatCategoryCode: 'Power',
+    DesignerName: 'Valentin Design',
+    MaximumSpeedMeasure: '41 kn',
+    RangeMeasure: '340 nmi',
+    BeamMeasure: '13.06 ft',
+    DisplacementMeasure: '22046 lb',
+    FuelTankCapacityMeasure: '317|gallon',
+    WaterTankCapacityMeasure: '79|gallon',
+    TotalEnginePowerQuantity: '880 hp',
+    HeadsCountNumeric: 1,
+    CabinsCountNumeric: 1,
+    BoatHullMaterialCode: 'Aluminum',
+    NominalLength: '42 ft',
+    LengthOverall: '41.67 ft',
+    Engines: [
+      { Make: 'Volvo Penta', Model: 'D6-440 DPI', Fuel: 'diesel', EnginePower: '440|horsepower', Type: 'Inboard/Outboard' },
+      { Make: 'Volvo Penta', Model: 'D6-440 DPI', Fuel: 'diesel', EnginePower: '440|horsepower', Type: 'Inboard/Outboard' },
+    ],
+    // No day-cruiser class in the feed's list; Tender because the hull is
+    // built for superyacht tender duty (internal lifting points).
+    BoatClassCode: ['Center Consoles', 'Tender'],
+    // Plain text: the listing page renders this field stripped of HTML.
+    GeneralBoatDescription:
+      'Asking €845,000 ex VAT (list price €981,070 ex VAT, fully equipped) — special offer, available now in Cannes. 2027 model year at 2026 prices, 2-year warranty. Private sea trials by appointment. The Alium 42 T-Top is an aluminium-hulled 42′ T-top designed by Valentin Design, shown here in the Two-Tone Grey Edition with a metallic grey finish. She tops out at 41 knots and burns about 85 L/h at 26 knots. Opening side wings create a 26 m² terrace on the water, and internal lifting points are engineered for superyacht tender operations. Key data — LOA 12.70 m · Beam 3.98 m · 10 t · 2 × Volvo Penta D6-440 DPI, 880 hp total · Max 41 kn · Range 340 nm · Fuel 1,200 L · Water 2 × 150 L Accommodation — Cabin with convertible double berth and bathroom Equipment — T-top and forward sunpad · Fold-down side wings · Flexiteek decking · 7.2 kWh lithium service batteries · Ice maker, gas grill, cabin electric hob · Garmin 16″ GPS · Fusion premium audio · Bow thruster · Telescopic anchor system · Bimini extension · Full winter cover Aluminium construction — Strength and durability · Light and fast · Impact resistant · Repairable · Recyclable · Reduced vibration · No osmosis. Particulars given in good faith but not guaranteed.',
+    Images: imgs('alium-42', 8, '2027 Alium 42 T-Top'),
   },
 ];
 

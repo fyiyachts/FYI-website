@@ -1,4 +1,5 @@
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { formatMoney, listPrice, usdEquivalent, type Money } from '../../api/_lib/price';
 
 /**
  * Data layer for the public SEO pages that mirror fyiyachts.com's URL
@@ -23,7 +24,10 @@ export interface PublicBoat {
   model: string;
   year?: number;
   lengthFt?: number;
+  /** USD-equivalent asking price (NormPrice) — sorting and price filters only. */
   priceUsd?: number;
+  /** Asking price in the listing's own currency — what cards display. */
+  listPrice?: Money;
   condition?: string; // New | Used
   classCode: string;
   city?: string;
@@ -131,7 +135,8 @@ export function normalizePublicBoat(it: Record<string, any>): PublicBoat | null 
     model: it.Model || '',
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
     lengthFt: num(it.LengthOverall ?? it.NominalLength),
-    priceUsd: it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price),
+    priceUsd: usdEquivalent(it),
+    listPrice: listPrice(it),
     condition: it.SaleClassCode || undefined,
     classCode: Array.isArray(it.BoatClassCode) ? it.BoatClassCode.join(', ') : it.BoatClassCode || '',
     city: loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : undefined,
@@ -552,5 +557,5 @@ export const findBrand = (slug: string): BrandPage | undefined =>
 export const findCategory = (slug: string): CategoryPage | undefined =>
   CATEGORY_PAGES.find(c => c.slug === slug);
 
-export const fmtUsd = (n?: number): string =>
-  n && Number.isFinite(n) ? `$${Math.round(n).toLocaleString('en-US')}` : 'Price on request';
+/** A boat's asking price as shown on cards: "$1,250,000", "€845,000", or "Price on request". */
+export const fmtBoatPrice = (b: { listPrice?: Money }): string => formatMoney(b.listPrice);

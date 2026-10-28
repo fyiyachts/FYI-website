@@ -3,7 +3,7 @@
 // prerenderer reuses the exact same data the app routes from.
 import {
   BRAND_PAGES, CATEGORY_PAGES, brandSeoTitle, brandSeoDescription,
-  normalizePublicBoat, isFyiCompany, resizeBG, type PublicBoat,
+  normalizePublicBoat, isFyiCompany, resizeBG, fmtBoatPrice, type PublicBoat,
 } from '../components/public/publicData';
 import { CONTENT_PAGES } from '../components/public/contentData';
 import { FYI_TEAM, memberByRepKey, memberBySlug, repKey, type TeamMember } from '../components/team/fyiTeam';
@@ -919,7 +919,7 @@ function inventoryHtml(heading: string, boats: { b: PublicBoat; href: string }[]
     const img = b.image
       ? `<img src="${esc(resizeBG(b.image, 400, 267))}" alt="${esc(cardLabel(b))}" width="400" height="267" loading="lazy" decoding="async" class="aspect-[3/2] w-full rounded object-cover" />`
       : '';
-    return `<li class="rounded border border-yacht-900/10 bg-white p-3"><a href="${esc(href)}" class="block">${img}<p class="mt-3 text-[14px] font-medium text-yacht-900">${esc(cardLabel(b))}</p><p class="mt-1 text-[13px] font-light text-yacht-900/60">${esc(meta)}</p><p class="mt-1 text-[14px] font-light text-yacht-900">${b.priceUsd ? esc(usdFmt(b.priceUsd)) : 'Price on Request'}</p></a></li>`;
+    return `<li class="rounded border border-yacht-900/10 bg-white p-3"><a href="${esc(href)}" class="block">${img}<p class="mt-3 text-[14px] font-medium text-yacht-900">${esc(cardLabel(b))}</p><p class="mt-1 text-[13px] font-light text-yacht-900/60">${esc(meta)}</p><p class="mt-1 text-[14px] font-light text-yacht-900">${esc(fmtBoatPrice(b) === 'Price on request' ? 'Price on Request' : fmtBoatPrice(b))}</p></a></li>`;
   }).join('');
   return `<h2 class="mt-2 text-xl font-light text-yacht-900">${esc(heading)}</h2>
 <p class="mt-2 text-[14px] font-light text-yacht-900/60">${total} listing${total === 1 ? '' : 's'} live now${range}. Updated ${new Date().toISOString().slice(0, 10)}.</p>
