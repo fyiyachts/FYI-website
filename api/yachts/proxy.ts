@@ -28,7 +28,9 @@ const UPSTREAM_TIMEOUT_BOT_MS = 2_800;
 // everyone else out: 1,183 of 9,175 requests in 12h were rejected this way
 // (2026-08-20), and a rejection renders an empty yacht grid.
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const MAX_REQUESTS_HUMAN = 60;
+// 180, up from 60 (2026-10-28): a few people behind one office IP browsing
+// boats tripped 60, and the listing lookup itself then got a 429.
+const MAX_REQUESTS_HUMAN = 180;
 // Desired engines fire 3–6 client-rendered proxy calls per view; 8/min emptied
 // those into 429s. Give them ~30/min while scrapers stay at 8.
 const MAX_REQUESTS_DESIRED = 30;
@@ -150,7 +152,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const traffic = classifyTraffic(req);
   const human = traffic === 'human';
 
-  if (isRateLimited(clientKey(req), rateLimitFor(traffic))) {
+  const docParam = req.query.documentid ?? req.query.id;
+  const docId = docParam ? String(Array.isArray(docParam) ? docParam[0] : docParam) : '';
+
+  // Single-listing lookups are exempt from the per-IP limit for people and
+  // wanted crawlers: one listing view is one lookup, and a 429 here is a
+  // visitor told the boat won't load. Unwanted scrapers stay limited.
+  const limited = !docId || traffic === 'unwanted';
+  if (limited && isRateLimited(clientKey(req), rateLimitFor(traffic))) {
     res.setHeader('Cache-Control', NO_STORE);
     res.setHeader('Retry-After', '60');
     return res.status(429).json({ error: 'Rate limit exceeded.', results: [], numResults: 0 });
@@ -158,8 +167,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Hand-entered listings (api/_lib/manualListings.ts) answer their own
   // documentid lookups — the upstream has never heard of them.
-  const docParam = req.query.documentid ?? req.query.id;
-  const docId = docParam ? String(Array.isArray(docParam) ? docParam[0] : docParam) : '';
   const manual = docId ? findManualListing(docId) : undefined;
   if (manual) {
     res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');

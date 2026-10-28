@@ -1,4 +1,5 @@
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { fetchJsonShared } from '../../utils/sharedFetch';
 
 /**
  * Data layer for the public SEO pages that mirror fyiyachts.com's URL
@@ -201,17 +202,16 @@ export async function fetchActiveInventory(): Promise<PublicBoat[]> {
   if (inventoryCache && Date.now() - inventoryCache.at < INVENTORY_TTL_MS) return inventoryCache.boats;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await fetch('/api/yachts/proxy?rows=400', { credentials: 'same-origin' });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const items: any[] = Array.isArray(data?.results) ? data.results : [];
-        if (items.length) {
-          const boats = items
-            .map(normalizePublicBoat)
-            .filter((b): b is PublicBoat => b !== null);
-          inventoryCache = { boats, at: Date.now() };
-          return boats;
-        }
+      // Shared: a page that mounts several inventory consumers at once makes
+      // one request, not one each.
+      const data = await fetchJsonShared<any>('/api/yachts/proxy?rows=400', INVENTORY_TTL_MS);
+      const items: any[] = Array.isArray(data?.results) ? data.results : [];
+      if (items.length) {
+        const boats = items
+          .map(normalizePublicBoat)
+          .filter((b): b is PublicBoat => b !== null);
+        inventoryCache = { boats, at: Date.now() };
+        return boats;
       }
     } catch { /* retry */ }
     await new Promise(r => setTimeout(r, 900));

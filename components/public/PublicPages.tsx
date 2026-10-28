@@ -10,6 +10,7 @@ import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { optImg, srcSet } from '../../utils/img';
+import { fetchJsonShared } from '../../utils/sharedFetch';
 import { FaqSection, CHARTER_FAQS, SELL_FAQS } from './Faq';
 import { LEASE_FAQS } from './faqData';
 import { CATEGORY_FAQS, ABOUT_FAQS, CONTACT_FAQS } from './categoryFaqs';
@@ -950,8 +951,7 @@ export function SoldYachtsPage() {
     const from = soldWindowStart();
     const PAGE = 400;
     const page = (start: number) =>
-      fetch(`/api/yachts/proxy?salesstatus=sold&rows=${PAGE}&start=${start}`)
-        .then(r => r.json())
+      fetchJsonShared<any>(`/api/yachts/proxy?salesstatus=sold&rows=${PAGE}&start=${start}`)
         .then(d => (Array.isArray(d?.results) ? (d.results as unknown[]) : []))
         .catch(() => [] as unknown[]);
     Promise.all([page(0), page(PAGE), page(PAGE * 2)])
@@ -1656,8 +1656,8 @@ function RecentlySoldStrip() {
   const [boats, setBoats] = useState<PublicBoat[]>([]);
   useEffect(() => {
     let alive = true;
-    fetch('/api/yachts/proxy?salesstatus=sold&rows=400')
-      .then(r => r.json())
+    // Same URL as the sold gallery's first page, so the two share one fetch.
+    fetchJsonShared<any>('/api/yachts/proxy?salesstatus=sold&rows=400&start=0')
       .then(d => {
         if (!alive) return;
         const items: unknown[] = Array.isArray(d?.results) ? d.results : [];

@@ -81,6 +81,8 @@ const usd = (n?: number) =>
 // timeout sits above the proxy's own worst case (feed + retry, PLS + retry).
 const LISTING_RETRY_DELAYS = [1000, 3000];
 const LISTING_FETCH_TIMEOUT_MS = 45_000;
+// Longest a 429's Retry-After is honoured before the next attempt.
+const LISTING_MAX_RETRY_AFTER_MS = 60_000;
 
 const stripHtml = (s: string) =>
   s.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
@@ -200,13 +202,21 @@ export default function PublicListingPage() {
     let ctl: AbortController | null = null;
     setState('loading');
     (async () => {
+      // A 429 is retried only after the server's Retry-After (capped), never
+      // on the short 1s/3s schedule.
+      let waitMs = 0;
       for (let attempt = 0; attempt <= LISTING_RETRY_DELAYS.length; attempt++) {
-        if (attempt > 0) await new Promise((r) => setTimeout(r, LISTING_RETRY_DELAYS[attempt - 1]));
+        if (attempt > 0) await new Promise((r) => setTimeout(r, waitMs || LISTING_RETRY_DELAYS[attempt - 1]));
         if (!alive) return;
+        waitMs = 0;
         ctl = new AbortController();
         const timer = setTimeout(() => ctl?.abort(), LISTING_FETCH_TIMEOUT_MS);
         try {
           const r = await fetch(`/api/yachts/proxy?documentid=${encodeURIComponent(id)}`, { signal: ctl.signal });
+          if (r.status === 429) {
+            const ra = Number(r.headers.get('Retry-After'));
+            waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 30) * 1000, LISTING_MAX_RETRY_AFTER_MS);
+          }
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = await r.json();
           if (!d || typeof d !== 'object' || d.error) throw new Error('bad response');
@@ -482,7 +492,7 @@ export default function PublicListingPage() {
           </div>
 
           <MoreLikeThis id={boat.id} make={boat.make} lengthFt={boat.lengthFt} />
-          <RecentlySoldStrip />
+          <RecentlySoldStrip id={boat.id} make={boat.make} lengthFt={boat.lengthFt} />
 
           {/* Standard disclaimer */}
           <p className="mt-12 border-t border-yacht-900/10 pt-6 text-[12px] font-light italic leading-6 text-yacht-900/45">
