@@ -8,6 +8,7 @@ import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track, trackAdsConversion } from '../../utils/analytics';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
+import { fetchJsonShared } from '../../utils/sharedFetch';
 
 // "Find Your Yacht Match" — a thumbs-up/down quiz over live inventory.
 // Rate ~10 boats, we score the rest of the fleet against what you liked and
@@ -222,8 +223,7 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
   const load = useCallback(() => {
     if (loadedRef.current) return;
     loadedRef.current = true;
-    fetch('/api/yachts/proxy?rows=200', { credentials: 'same-origin' })
-      .then((r) => r.json())
+    fetchJsonShared<any>('/api/yachts/proxy?rows=200')
       .then((d) => {
         const all = (Array.isArray(d?.results) ? d.results : []).map(mapBoat).filter((b: QuizBoat) => b.id);
         setBoats(all);

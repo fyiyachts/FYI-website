@@ -52,7 +52,8 @@ const num = (v: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-function normalize(it: Record<string, any>): FleetBoat {
+/** One raw feed row (or hand-entered listing, same shape) as a FleetBoat. */
+export function normalizeFleetItem(it: Record<string, any>): FleetBoat {
   const loc = it.BoatLocation || {};
   const images: string[] = Array.isArray(it.Images)
     ? it.Images.map((x: any) => (typeof x === 'string' ? x : x?.Uri || x?.url || '')).filter(Boolean)
@@ -92,7 +93,7 @@ export async function fetchFleet(): Promise<FleetBoat[]> {
     const items: any[] = Array.isArray(data?.results) ? data.results : [];
     let added = 0;
     for (const it of items) {
-      const b = normalize(it);
+      const b = normalizeFleetItem(it);
       if (!b.id || seen.has(b.id)) continue;
       seen.add(b.id);
       boats.push(b);

@@ -22,6 +22,7 @@ import FYILogo from '../layout/FYILogo';
 import BriannaWidget from '../chat/BriannaWidget';
 import { optImg, srcSet } from '../../utils/img';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { fetchJsonShared } from '../../utils/sharedFetch';
 import { track as trackEvent } from '../../utils/analytics';
 import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
@@ -29,7 +30,7 @@ import { identifyVisitor } from '../../utils/hubspotTracking';
 import { VOICE_SEARCH_ENABLED, SPANISH_ENABLED } from '../../utils/featureFlags';
 import { languageToggleTarget } from '../es/esRoutes';
 import { FYI_TEAM, repKey } from '../team/fyiTeam';
-import { BRAND_PAGES, CATEGORY_PAGES, brandMake, soldWindowStart, withinSoldWindow } from '../public/publicData';
+import { BRAND_PAGES, CATEGORY_PAGES, brandMake } from '../public/publicData';
 import { CHARTER_FLEET, CHARTER_FROM_PRICE, fromRate } from '../public/charterFleet';
 import { TESTIMONIALS } from '../public/testimonials';
 import { FaqSection } from '../public/Faq';
@@ -232,14 +233,6 @@ const formatPrice = (n?: number): string =>
   n && Number.isFinite(n) ? `$${Math.round(n).toLocaleString('en-US')}` : 'Price on request';
 
 /** Map a raw BoatsGroup feed item (see api/yachts/proxy.ts) to a fleet card. */
-/** First raw (un-resized) photo URL on a feed item, or '' if it has none. */
-function rawFeedImage(it: Record<string, any>): string {
-  const images: string[] = Array.isArray(it.Images)
-    ? it.Images.map((x: any) => (typeof x === 'string' ? x : x?.Uri || x?.url || '')).filter(Boolean)
-    : [];
-  return images[0] || '';
-}
-
 function toFleetCard(it: Record<string, any>): FleetCard | null {
   const id = String(it.DocumentID || '');
   const images: string[] = Array.isArray(it.Images)
@@ -417,15 +410,13 @@ function TeamMegaPanel() {
 }
 
 // Featured rail for the Yachts panel: FYI's seven highest-asking active
-// listings, straight from the feed. Cached and idle-prefetched on the same
-// pattern as the Sell panel's sold showcase, so the rail is populated before
-// the first hover rather than opening on a spinner.
+// listings. Loaded when the panel first opens and cached in sessionStorage
+// (survives navigation), on the same pattern as the Sell panel's showcase.
 type TopPick = { id: string; title: string; price: string; length: string; image: string };
 const TOP_CACHE_KEY = 'fyi:mega-top:v1';
 const TOP_PICK_COUNT = 7;
 
 let megaTopCache: TopPick[] | null = null;
-let megaTopInflight: Promise<TopPick[]> | null = null;
 
 function readTopCache(): TopPick[] | null {
   if (megaTopCache) return megaTopCache;
@@ -441,52 +432,43 @@ function readTopCache(): TopPick[] | null {
   return null;
 }
 
+// Both nav panels (Yachts' top picks, Sell's sold showcase) are filled from
+// ONE small, CDN-cached request to /api/yachts/showcase, made when a panel
+// first opens. They used to pull rows=300 and the whole sold book (3 x
+// rows=400) through the proxy on every page, idle-prefetched — which, with the
+// listing page's own strips, tripped the proxy's per-IP rate limit.
+interface MenuCard {
+  id: string; name: string; year?: number; make?: string; model?: string;
+  lengthFt?: number; priceUsd?: number; image?: string;
+}
+const MENU_SHOWCASE_URL = '/api/yachts/showcase?sections=menuTop,menuSold';
+const fetchMenuShowcase = () =>
+  fetchJsonShared<{ menuTop?: MenuCard[]; menuSold?: MenuCard[] }>(MENU_SHOWCASE_URL);
+
 function fetchTopPicks(): Promise<TopPick[]> {
   const cached = readTopCache();
   if (cached) return Promise.resolve(cached);
-  if (megaTopInflight) return megaTopInflight;
-  megaTopInflight = fetch('/api/yachts/proxy?rows=300')
-    .then(r => r.json())
+  return fetchMenuShowcase()
     .then(d => {
-      const items: any[] = Array.isArray(d?.results) ? d.results : [];
-      const picks = items
-        // toFleetCard drops anything without a photo, which is what we want —
-        // a rail slide is the photo. Price-hidden listings format as "Price on
-        // request" and parse to 0, so they sort out of the top naturally.
-        .map(it => ({ it, c: toFleetCard(it) }))
-        .filter((x): x is { it: any; c: FleetCard } => x.c !== null)
-        .map(x => ({ ...x, num: parseFloat(x.c.price.replace(/[^0-9.]/g, '')) || 0 }))
-        .filter(x => x.num > 0)
-        .sort((a, b) => b.num - a.num)
+      const picks: TopPick[] = (d.menuTop ?? [])
+        .filter(c => c.image)
         .slice(0, TOP_PICK_COUNT)
-        .map(({ it, c }) => ({
+        .map(c => ({
           id: c.id,
-          title: c.title,
-          price: c.price,
-          length: c.length,
-          // Sized off the raw feed URL, not c.image: resizeBG only rewrites
-          // `/images/` paths, so re-resizing an already-resized URL is a silent
-          // no-op and the slide would keep toFleetCard's 4:3. Rail slides run
-          // ~380px wide, so 900x600 covers 2x at the 3:2 the masters are shot
-          // in — nothing is cropped.
-          image: resizeBG(rawFeedImage(it), 900, 600),
+          title: yachtTitle(c.year, c.make, c.model) || c.name || 'Yacht',
+          price: formatPrice(c.priceUsd),
+          length: c.lengthFt ? `${Math.round(c.lengthFt)}'` : '—',
+          // Rail slides run ~380px wide, so 900x600 covers 2x at the 3:2 the
+          // masters are shot in — nothing is cropped.
+          image: resizeBG(c.image as string, 900, 600),
         }));
-      megaTopCache = picks;
-      try { sessionStorage.setItem(TOP_CACHE_KEY, JSON.stringify(picks)); } catch { /* private mode */ }
+      if (picks.length) {
+        megaTopCache = picks;
+        try { sessionStorage.setItem(TOP_CACHE_KEY, JSON.stringify(picks)); } catch { /* private mode */ }
+      }
       return picks;
     })
-    .catch(() => [] as TopPick[])
-    .finally(() => { megaTopInflight = null; });
-  return megaTopInflight;
-}
-
-/** Warm the top-picks cache while the browser is idle, before the first hover. */
-export function prefetchTopPicks() {
-  if (typeof window === 'undefined' || readTopCache()) return;
-  const run = () => { void fetchTopPicks(); };
-  const ric = (window as any).requestIdleCallback;
-  if (typeof ric === 'function') ric(run, { timeout: 4000 });
-  else window.setTimeout(run, 2000);
+    .catch(() => [] as TopPick[]);
 }
 
 const SLIDE_MS = 4200;
@@ -701,15 +683,13 @@ function CharterMegaPanel() {
 
 // Live sold showcase for the Sell panel — social proof straight from the feed.
 //
-// The sold query returns hundreds of rows, so hovering "Sell" used to sit on a
-// spinner while it downloaded. Now the result is cached in sessionStorage
-// (survives navigation) and prefetched while the browser is idle, so the panel
-// is already populated the first time it opens.
+// Three boats picked server-side (/api/yachts/showcase) instead of the browser
+// downloading the whole sold book; cached in sessionStorage (survives
+// navigation), so only the first open in a visit waits on the network.
 type SoldPick = { id: string; title: string; boatName?: string | undefined; image: string };
 const SOLD_CACHE_KEY = 'fyi:mega-sold:v1';
 
 let megaSoldCache: SoldPick[] | null = null;
-let megaSoldInflight: Promise<SoldPick[]> | null = null;
 
 function readSoldCache(): SoldPick[] | null {
   if (megaSoldCache) return megaSoldCache;
@@ -728,75 +708,29 @@ function readSoldCache(): SoldPick[] | null {
 function fetchSoldPicks(): Promise<SoldPick[]> {
   const cached = readSoldCache();
   if (cached) return Promise.resolve(cached);
-  if (megaSoldInflight) return megaSoldInflight;
-  // The sold book is ~1,000 rows across three pages and the feed does not hand
-  // back the newest closings first, so pull all of it — the result is cached in
-  // sessionStorage and prefetched while the browser is idle, so this runs once
-  // per visit, before anyone opens the Sell menu.
-  const PAGE = 400;
-  const page = (start: number) =>
-    fetch(`/api/yachts/proxy?salesstatus=sold&rows=${PAGE}&start=${start}`)
-      .then(r => r.json())
-      .then(d => (Array.isArray(d?.results) ? (d.results as any[]) : []))
-      .catch(() => [] as any[]);
-  megaSoldInflight = Promise.all([page(0), page(PAGE), page(PAGE * 2)])
-    .then(pages => {
-        const seenIds = new Set<string>();
-        const items: any[] = pages.flat()
-          .filter(it => it?.DocumentID && !seenIds.has(String(it.DocumentID)) && seenIds.add(String(it.DocumentID)));
-        // Showcase criteria (client, 2026-07-22): sold vessels over 80 feet
-        // and newer than 15 model-years. The feed rarely has 3 that strict,
-        // so backfill with the largest newest 80-footers of any age.
-        //
-        // Scoped since 2026-09-03 to the same ROLLING 12-MONTH WINDOW as the
-        // sold galleries, ordered LARGEST FIRST. The window is narrow — five
-        // boats over 80ft closed in the last year — so if it cannot fill the
-        // three tiles, the older book backfills rather than leaving gaps.
-        const from = soldWindowStart();
-        const minYear = new Date().getFullYear() - 15;
-        const withLen = items.map(it => ({
-          it,
-          len: parseFloat(String(it.LengthOverall ?? it.NominalLength ?? '').replace(/[^0-9.]/g, '')),
-          yr: Number(it.ModelYear) || 0,
-          sold: String(it.SoldDate ?? ''),
-        })).filter(x => Number.isFinite(x.len) && x.len > 80);
-        const byLength = (a: typeof withLen[number], b: typeof withLen[number]) =>
-          b.len - a.len || b.sold.localeCompare(a.sold) || b.yr - a.yr;
-        const inWindow = withLen.filter(x => withinSoldWindow(x.sold, from)).sort(byLength);
-        const older = withLen.filter(x => !withinSoldWindow(x.sold, from));
-        const strict = older.filter(x => x.yr > minYear).sort(byLength);
-        const rest = older.filter(x => x.yr <= minYear).sort(byLength);
-        const picks = [...inWindow, ...strict, ...rest]
-          .map(({ it }) => it)
-          .map(it => {
-            const img = (Array.isArray(it.Images) ? it.Images : [])
-              .map((x: any) => (typeof x === 'string' ? x : x?.Uri || ''))
-              .filter(Boolean)[0];
-            return img ? {
-              id: String(it.DocumentID),
-              title: yachtTitle(it.ModelYear, it.MakeString, it.Model) || it.BoatName || 'Sold yacht',
-              boatName: boatNameLine(it.BoatName, yachtTitle(it.ModelYear, it.MakeString, it.Model)),
-              image: resizeBG(img, 700, 466),
-            } : null;
-          })
-          .flatMap((x): SoldPick[] => (x ? [x] : []))
-          .slice(0, 3);
+  // Sold boats over 80ft — the rolling window first, then younger than 15
+  // model-years, then the rest, each largest first (built server-side).
+  return fetchMenuShowcase()
+    .then(d => {
+      const picks: SoldPick[] = (d.menuSold ?? [])
+        .filter(c => c.image)
+        .slice(0, 3)
+        .map(c => {
+          const ymm = yachtTitle(c.year, c.make, c.model);
+          return {
+            id: c.id,
+            title: ymm || c.name || 'Sold yacht',
+            boatName: boatNameLine(c.name, ymm),
+            image: resizeBG(c.image as string, 700, 466),
+          };
+        });
+      if (picks.length) {
         megaSoldCache = picks;
         try { sessionStorage.setItem(SOLD_CACHE_KEY, JSON.stringify(picks)); } catch { /* private mode */ }
-        return picks;
-      })
-    .catch(() => [] as SoldPick[])
-    .finally(() => { megaSoldInflight = null; });
-  return megaSoldInflight;
-}
-
-/** Warm the sold cache while the browser is idle, before anyone hovers Sell. */
-export function prefetchSoldPicks() {
-  if (typeof window === 'undefined' || readSoldCache()) return;
-  const run = () => { void fetchSoldPicks(); };
-  const ric = (window as any).requestIdleCallback;
-  if (typeof ric === 'function') ric(run, { timeout: 4000 });
-  else window.setTimeout(run, 2000);
+      }
+      return picks;
+    })
+    .catch(() => [] as SoldPick[]);
 }
 
 function SellMegaPanel() {
@@ -954,9 +888,8 @@ export function HomeNav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Warm the Sell panel's sold showcase and the Yachts panel's featured rail
-  // before the first hover.
-  useEffect(() => { prefetchSoldPicks(); prefetchTopPicks(); }, []);
+  // The Sell and Yachts panels load their boats when first opened (one shared
+  // request, cached for the session) — no idle prefetch on every page view.
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPanel(null); };
