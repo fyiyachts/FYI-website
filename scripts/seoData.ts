@@ -3,7 +3,7 @@
 // prerenderer reuses the exact same data the app routes from.
 import {
   BRAND_PAGES, CATEGORY_PAGES, brandSeoTitle, brandSeoDescription,
-  normalizePublicBoat, isFyiCompany, resizeBG, type PublicBoat,
+  normalizePublicBoat, isFyiCompany, resizeBG, fmtBoatPrice, type PublicBoat,
 } from '../components/public/publicData';
 import { CONTENT_PAGES } from '../components/public/contentData';
 import { FYI_TEAM, memberByRepKey, memberBySlug, repKey, type TeamMember } from '../components/team/fyiTeam';
@@ -13,6 +13,12 @@ import { CHARTER_FAQS, SELL_FAQS, LEASE_FAQS, type QA } from '../components/publ
 import { CATEGORY_FAQS, ABOUT_FAQS, CONTACT_FAQS, GENERAL_FAQS } from '../components/public/categoryFaqs';
 import { CASE_STUDIES } from '../components/public/caseStudyData';
 import { getBrandDetail } from '../components/public/brandContent';
+import { createElement } from 'react';
+import { renderToString } from 'react-dom/server';
+import { LpShell } from '../components/lp/LpChrome';
+import QuickForm from '../components/lp/QuickForm';
+import { CC_FAQS, CC_HERO, LP_DESCRIPTION, LP_PATH, LP_TITLE, QUICK_FORM, isCenterConsole } from '../components/lp/ccContent';
+import { plsSearch, PLS_CARD_FIELDS } from '../api/_lib/plsFeed';
 import {
   ALL_CHARTER_VESSELS, CHARTER_FLEET, TERM_CHARTER, CHARTER_INCLUDES,
   CHARTER_FROM_PRICE, CHARTER_PHONE_DISPLAY, CHARTER_EMAIL, isTermVessel,
@@ -53,6 +59,13 @@ export interface SeoRoute {
   // wrong question to ask about a route, and answering it that way labelled a
   // commercial category page "FYI News".
   isNews?: boolean;
+  // Kept out of search: prerender emits a robots noindex tag and leaves the
+  // route out of the sitemap. The paid-traffic landing pages (/lp/*).
+  noindex?: boolean;
+  // The page's own first paint, used instead of the generic static shell. The
+  // landing pages set it so the CDN serves the header and hero React mounts
+  // over, rather than a stand-in that gets swapped out (and moves the LCP).
+  shellHtml?: string;
 }
 
 const ORG = {
@@ -202,6 +215,17 @@ const BRAND_SLUG_ALIASES: Record<string, string> = {
 
 export function buildRoutes(newsIndex: { slug: string; title: string; date: string; category: string; image: string; excerpt: string }[]): SeoRoute[] {
   const routes: SeoRoute[] = [];
+
+  // ChatGPT Ads landing page: noindex, no nav, not in the sitemap. The shell
+  // gets the live count in attachLandingShells once the build feed answers.
+  routes.push({
+    path: LP_PATH,
+    title: LP_TITLE,
+    description: LP_DESCRIPTION,
+    noindex: true,
+    jsonLd: [faqSchema(CC_FAQS)],
+    shellHtml: landingShell(null),
+  });
 
   routes.push({
     path: '/',
@@ -919,7 +943,7 @@ function inventoryHtml(heading: string, boats: { b: PublicBoat; href: string }[]
     const img = b.image
       ? `<img src="${esc(resizeBG(b.image, 400, 267))}" alt="${esc(cardLabel(b))}" width="400" height="267" loading="lazy" decoding="async" class="aspect-[3/2] w-full rounded object-cover" />`
       : '';
-    return `<li class="rounded border border-yacht-900/10 bg-white p-3"><a href="${esc(href)}" class="block">${img}<p class="mt-3 text-[14px] font-medium text-yacht-900">${esc(cardLabel(b))}</p><p class="mt-1 text-[13px] font-light text-yacht-900/60">${esc(meta)}</p><p class="mt-1 text-[14px] font-light text-yacht-900">${b.priceUsd ? esc(usdFmt(b.priceUsd)) : 'Price on Request'}</p></a></li>`;
+    return `<li class="rounded border border-yacht-900/10 bg-white p-3"><a href="${esc(href)}" class="block">${img}<p class="mt-3 text-[14px] font-medium text-yacht-900">${esc(cardLabel(b))}</p><p class="mt-1 text-[13px] font-light text-yacht-900/60">${esc(meta)}</p><p class="mt-1 text-[14px] font-light text-yacht-900">${esc(fmtBoatPrice(b) === 'Price on request' ? 'Price on Request' : fmtBoatPrice(b))}</p></a></li>`;
   }).join('');
   return `<h2 class="mt-2 text-xl font-light text-yacht-900">${esc(heading)}</h2>
 <p class="mt-2 text-[14px] font-light text-yacht-900/60">${total} listing${total === 1 ? '' : 's'} live now${range}. Updated ${new Date().toISOString().slice(0, 10)}.</p>
@@ -1114,3 +1138,53 @@ export function attachHubInventory(routes: SeoRoute[], inv: { fyi: PublicBoat[];
 // so its links and counts can't drift from the pages that exist.
 export { BRAND_PAGES, CATEGORY_PAGES, FYI_TEAM };
 export const MANUAL_LISTING_COUNT = MANUAL_LISTINGS.length;
+
+/**
+ * The landing page's header + hero (with its quick form) as HTML the app
+ * hydrates (index.tsx), so renderToString — hydration needs its text-node
+ * markers. The tree must match the page's first client render, props
+ * included. React also emits a <link rel=preload> for the eager logo image
+ * ahead of the markup; that node isn't part of the component tree hydration
+ * walks, so it is dropped.
+ */
+function landingShell(count: number | null): string {
+  const form = createElement(QuickForm, { ...QUICK_FORM, placement: 'hero' });
+  return renderToString(createElement(LpShell, { hero: { ...CC_HERO, count, form } }))
+    .replace(/^(?:<link [^>]*>)+/, '');
+}
+
+/**
+ * Bake the live center console count into the landing page's trust strip,
+ * computed the way the page computes it: FYI's own center consoles (feed +
+ * hand-entered) plus PLS's co-brokerage total, less FYI's own boats on PLS's
+ * first page (the co-brokerage search drops those, page by page). Left out,
+ * never guessed, when either feed didn't answer at build time.
+ */
+export async function attachLandingShells(routes: SeoRoute[], inv: { fyi: PublicBoat[] }): Promise<number | null> {
+  const r = routes.find((x) => x.path === LP_PATH);
+  if (!r || !inv.fyi.length) return null;
+  const manual = MANUAL_LISTINGS.map(normalizePublicBoat).filter((b): b is PublicBoat => b !== null);
+  const own = [...inv.fyi, ...manual];
+  const ownCc = own.filter((b) => isCenterConsole(b.classCode)).length;
+  // The live search's exact query, fields included: PLS answers "Service
+  // Unavailable" to a length-sorted search that asks for DocumentID alone.
+  const search = () => plsSearch(
+    { class: 'Center Consoles', sort: 'Length|desc', rows: '24' },
+    { fields: PLS_CARD_FIELDS, cardOnly: true },
+  );
+  try {
+    const page = await search().catch(() => search());
+    if (!page.numResults) {
+      console.warn(`[seoData] landing count: PLS returned no results (BOATS_PLS_API_KEY ${process.env.BOATS_PLS_API_KEY ? 'set' : 'not set'})`);
+      return null;
+    }
+    const ids = new Set(own.map((b) => b.id));
+    const dropped = page.results.filter((x) => ids.has(String(x.DocumentID))).length;
+    const count = ownCc + page.numResults - dropped;
+    r.shellHtml = landingShell(count);
+    return count;
+  } catch (err) {
+    console.warn(`[seoData] landing count: ${(err as Error)?.message || err}`);
+    return null;
+  }
+}

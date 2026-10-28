@@ -25,7 +25,7 @@ import { SellScrollHero } from './scrollWorld/SellScrollHero';
 import {
   BRAND_PAGES, CATEGORY_PAGES, brandMake, brandSeoTitle, brandSeoDescription,
   fetchActiveInventory, searchCobrokerage,
-  fmtUsd, normalizePublicBoat,
+  fmtBoatPrice, normalizePublicBoat,
   compareSold, soldWindowStart,
   type BrandPage, type CategoryPage, type PublicBoat,
 } from './publicData';
@@ -205,7 +205,7 @@ function BoatCard({ boat, priority = false }: { boat: PublicBoat; priority?: boo
             <span className="flex items-center gap-1.5 text-[12px] font-light text-yacht-900/55">
               {boat.city || boat.state || boat.country ? (<><MapPin className="h-3.5 w-3.5" />{[boat.city, boat.state || boat.country].filter(Boolean).join(', ')}</>) : boat.model}
             </span>
-            <span className="text-sm font-semibold text-yacht-900">{fmtUsd(boat.priceUsd)}</span>
+            <span className="text-sm font-semibold text-yacht-900">{fmtBoatPrice(boat)}</span>
           </div>
         </div>
       </a>

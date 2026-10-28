@@ -148,9 +148,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 const toCard = (b: InventoryBoat) => ({
   id: b.id,
   title: b.name,
-  price: b.priceUsd != null
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(b.priceUsd)
-    : 'Price on request',
+  price: b.priceLabel, // own currency: "$1,250,000", "€845,000"
   year: b.year ?? null,
   lengthFt: b.lengthFt ?? null,
   location: [b.city, b.state || b.country].filter(Boolean).join(', ') || null,
@@ -201,7 +199,9 @@ async function runTool(
           + 'The visitor sees rich cards for these results — do not restate every spec.',
       matches: matches.map((b) => ({
         id: b.id, name: b.name, make: b.make, model: b.model, year: b.year,
-        length_ft: b.lengthFt, price_usd: b.priceUsd ?? 'hidden',
+        // asking_price is what to quote (listing's own currency); price_usd is
+        // the USD equivalent, for budget comparisons only.
+        length_ft: b.lengthFt, asking_price: b.priceUsd != null ? b.priceLabel : 'hidden', price_usd: b.priceUsd ?? 'hidden',
         class: b.classCode, category: b.category, condition: b.condition,
         location: [b.city, b.state, b.country].filter(Boolean).join(', ') || undefined,
         cabins: b.cabins, engines: b.engines, cruise_speed: b.cruiseSpeed,

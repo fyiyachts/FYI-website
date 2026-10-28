@@ -39,9 +39,13 @@ const redirectedPaths = new Set(
 // Bundle the TS route manifest so it can be imported here.
 const dataOut = join(root, 'node_modules', '.cache', 'seo-data.mjs');
 mkdirSync(dirname(dataOut), { recursive: true });
-execSync(`npx esbuild scripts/seoData.ts --bundle --format=esm --platform=node --outfile=${JSON.stringify(dataOut)}`, { cwd: root, stdio: 'pipe' });
+// React stays external: react-dom/server is CommonJS that requires Node
+// built-ins, which an ESM bundle can't do; Node resolves it from node_modules.
+// module-first main fields so lucide-react bundles as ESM (its CJS build
+// require()s react, which the ESM bundle can't do either).
+execSync(`npx esbuild scripts/seoData.ts --bundle --format=esm --platform=node --jsx=automatic --main-fields=module,main --external:react --external:react-dom --outfile=${JSON.stringify(dataOut)}`, { cwd: root, stdio: 'pipe' });
 const {
-  buildRoutes, fetchBuildInventory, attachHubInventory,
+  buildRoutes, fetchBuildInventory, attachHubInventory, attachLandingShells,
   BRAND_PAGES, CATEGORY_PAGES, FYI_TEAM, MANUAL_LISTING_COUNT,
 } = await import(pathToFileURL(dataOut).href);
 
@@ -58,6 +62,8 @@ const routes = buildRoutes(newsIndex);
 const inventory = await fetchBuildInventory();
 const hubsTouched = attachHubInventory(routes, inventory);
 console.log(`inventory: ${inventory.fyi.length} FYI + ${inventory.worldwide.length} worldwide listing(s) → baked into ${hubsTouched} hub page(s)`);
+const lpCount = await attachLandingShells(routes, inventory);
+console.log(`landing pages: ${lpCount ?? 'no'} center console count baked in`);
 
 // index.html carries static description/OG/Twitter meta for the bare domain and
 // client-rendered routes. Strip that managed block from the template so each
@@ -185,6 +191,7 @@ for (const r of routes) {
     // fetch resolves. Without the guard, Google's rendered DOM shows the generic
     // description and the facts are never seen by a searcher.
     `<meta name="description" content="${esc(r.description)}" data-static-path="${esc(r.path)}" />`,
+    r.noindex ? `<meta name="robots" content="noindex" />` : '',
     `<link rel="canonical" href="${esc(canonical)}" />`,
     // hreflang. Google reads these from the served HTML; the React tier already
     // declared the same pairs but injected them on mount, so they landed on 0
@@ -209,7 +216,7 @@ for (const r of routes) {
   ].filter(Boolean).join('\n    ');
 
   let html = template.replace(/<title>.*?<\/title>/s, head);
-  html = html.replace('<div id="root"></div>', `<div id="root">${staticShell(r)}</div>`);
+  html = html.replace('<div id="root"></div>', `<div id="root">${r.shellHtml ?? staticShell(r)}</div>`);
   const outDir = join(dist, ...r.path.split('/').filter(Boolean));
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'index.html'), html);
@@ -246,7 +253,7 @@ const newsDate = new Map(newsIndex.map((p) => [`/${p.slug}`, isoDate(p.date)]));
 // hard-coding /es, which keeps this correct by construction: switch any page
 // off with a redirect later and it leaves the sitemap on the next build
 // instead of quietly advertising a 301.
-const indexable = routes.filter((r) => !r.canonicalPath && !redirectedPaths.has(r.path));
+const indexable = routes.filter((r) => !r.canonicalPath && !r.noindex && !redirectedPaths.has(r.path));
 const droppedRedirects = routes.filter((r) => redirectedPaths.has(r.path)).map((r) => r.path);
 if (droppedRedirects.length) {
   console.log(`sitemap: excluded ${droppedRedirects.length} redirected path(s) — ${droppedRedirects.join(', ')}`);

@@ -19,12 +19,18 @@ const esc = (v: unknown) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// Lead sources a page may claim for itself; anything else is "Website". The
+// ChatGPT Ads landing page (/lp/center-consoles) tags its leads so they can be
+// counted. Each value must be an option of HubSpot's lead_source dropdown.
+const PAGE_LEAD_SOURCES = new Set(['ChatGPT Ads']);
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return methodNotAllowed(res);
 
   try {
     const body = parseJsonBody(req);
     const { yacht, attribution } = body;
+    const leadSource: string = PAGE_LEAD_SOURCES.has(body.leadSource) ? body.leadSource : 'Website';
     if (!yacht?.title) return fail(res, 'Yacht info is required', 400);
 
     // Bot/spam screen. Runs before any delivery work so junk costs us nothing
@@ -102,7 +108,7 @@ export default async function handler(req: any, res: any) {
           from: `"FYI Yachts Portal" <${getSmtpUser()}>`,
           to: 'sales@fyiyachts.com',
           replyTo: email,
-          subject: `Inquiry: ${yacht.title} — ${yacht.price || 'Price on Request'}`,
+          subject: `${leadSource === 'Website' ? '' : `[${leadSource}] `}Inquiry: ${yacht.title} — ${yacht.price || 'Price on Request'}`,
           html,
         });
         emailOk = true;
@@ -126,7 +132,7 @@ export default async function handler(req: any, res: any) {
               .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
             attribution: attr,
           },
-          { leadSource: 'Website', noteTitle: 'Website yacht inquiry' },
+          { leadSource, noteTitle: leadSource === 'Website' ? 'Website yacht inquiry' : `${leadSource} inquiry` },
         );
         hubspotOk = true;
       } catch (err) {
@@ -142,7 +148,7 @@ export default async function handler(req: any, res: any) {
       if (Number.isFinite(lengthFt) && lengthFt >= 20 && lengthFt < 400) {
         await recordLeadSizeByEmail(HS_TOKEN, String(email), lengthFt, {
           firstname: String(name).split(/\s+/)[0],
-          lead_source: 'Website',
+          lead_source: leadSource,
         }).catch(() => {});
       }
     }

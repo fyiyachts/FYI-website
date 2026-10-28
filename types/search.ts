@@ -7,7 +7,10 @@ export interface PineconeBoat {
   model?: string;
   year?: number;
   length?: number;
+  /** USD-equivalent asking price (NormPrice): sorting, filters, finance maths. */
   price?: number;
+  /** Asking price in the listing's own currency, for display (see formatBoatPrice). */
+  listPrice?: { amount: number; currency: string };
   category?: string;
   classCode?: string;
   hullMaterial?: string;

@@ -14,6 +14,7 @@ type VercelResponse = {
 
 import { MANUAL_LISTINGS } from './_lib/manualListings.js';
 import { countryName } from './_lib/countryName.js';
+import { formatMoney, listPrice } from './_lib/price.js';
 
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -45,7 +46,7 @@ function title(it: Record<string, any>): string {
 function line(it: Record<string, any>): { len: number; text: string } {
   const loc = it.BoatLocation || {};
   const lengthFt = num(it.LengthOverall ?? it.NominalLength);
-  const price = it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price);
+  const price = listPrice(it); // own currency: "€845,000", "$7,900,000"
   const name = clean(it.BoatName);
   const t = title(it);
   const city = loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? clean(loc.BoatCityName) : '';
@@ -54,7 +55,7 @@ function line(it: Record<string, any>): { len: number; text: string } {
   const parts = [
     `- ${t}${name && !t.toLowerCase().includes(name.toLowerCase()) ? `, "${name}"` : ''}`,
     lengthFt ? `${Math.round(lengthFt)} ft` : 'Length on request',
-    price && price > 0 ? `$${Math.round(price).toLocaleString('en-US')}` : 'Price on request',
+    formatMoney(price, 'Price on request'),
     ...(where ? [where] : []),
     `${SITE}/listing/${String(it.DocumentID).replace(/[^0-9]/g, '')}`,
   ];

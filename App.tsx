@@ -5,6 +5,9 @@ import LoginPage from './components/auth/LoginPage';
 import QuizUnavailablePage from './components/quiz/QuizUnavailablePage';
 import NotFoundPage from './components/public/NotFoundPage';
 import ThankYouPage from './components/public/ThankYouPage';
+// Eager: it is only the header + hero, hydrated from the prerendered HTML.
+// The rest of the page is its own chunk (see the component).
+import CenterConsolePage from './components/lp/CenterConsolePage';
 import { CaseStudiesPage, CaseStudyPage } from './components/public/CaseStudies';
 import HomePage from './components/home/HomePage';
 import {
@@ -216,6 +219,8 @@ export default function App() {
         {/* Conversion destination for every public form — gives GA4/Ads a URL
             to fire against, which an inline confirmation never had. */}
         <Route path="/thank-you" element={<ThankYouPage />} />
+        {/* Paid-traffic landing pages: noindex, no nav, not in the sitemap. */}
+        <Route path="/lp/center-consoles" element={<CenterConsolePage />} />
         {/* Narrative proof: published closings told as deals, sourced from
             FYI's own announcements (components/public/caseStudyData.ts). */}
         <Route path="/case-studies" element={<CaseStudiesPage />} />

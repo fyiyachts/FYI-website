@@ -1,3 +1,5 @@
+import { formatMoney } from '../api/_lib/price';
+
 export function formatPrice(value: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -51,4 +53,16 @@ export function formatDaysListed(listingDate: number): string {
 export function parsePriceNumber(price: string): number | null {
   const num = parseFloat(price.replace(/[^0-9.]/g, ''));
   return isNaN(num) ? null : num;
+}
+
+/**
+ * A boat's asking price as shown, in its own currency ("€845,000") when the
+ * record says so; otherwise its USD figure exactly as formatPrice prints it.
+ */
+export function formatBoatPrice(
+  boat: { price?: number; listPrice?: { amount: number; currency: string } },
+  fallback = 'Price on Request',
+): string {
+  if (boat.listPrice) return formatMoney(boat.listPrice, fallback);
+  return boat.price ? formatPrice(boat.price) : fallback;
 }

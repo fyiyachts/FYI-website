@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { PineconeBoat } from '../../types/search';
-import { formatPrice } from '../../utils/formatters';
+import { formatBoatPrice } from '../../utils/formatters';
 import SaveButton from '../saved/SaveButton';
 import CompareButton from '../compare/CompareButton';
 import { MapPin, Ruler, Calendar, Bell, BellRing, Clock } from 'lucide-react';
@@ -34,7 +34,7 @@ export default function YachtCard({ boat, showDaysListed }: Props) {
     } else {
       setPriceAlert(boatId, {
         title,
-        price: boat.price ? formatPrice(boat.price) : 'N/A',
+        price: formatBoatPrice(boat, 'N/A'),
         image: imageUrl,
         savedAt: Date.now(),
       });
@@ -88,7 +88,7 @@ export default function YachtCard({ boat, showDaysListed }: Props) {
         <h3 className={`text-white font-medium text-sm line-clamp-1 ${nameLine ? '' : 'mb-1'}`}>{title}</h3>
         {nameLine && <p className="mb-1 truncate text-xs font-light italic text-white/50">{nameLine}</p>}
         <p className="text-yacht-cream font-bold text-lg">
-          {boat.price ? formatPrice(boat.price) : 'Price on Request'}
+          {formatBoatPrice(boat)}
         </p>
         <div className="flex items-center gap-3 mt-2 text-white/40 text-xs">
           {boat.length && (

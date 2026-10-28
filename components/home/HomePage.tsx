@@ -22,6 +22,7 @@ import FYILogo from '../layout/FYILogo';
 import BriannaWidget from '../chat/BriannaWidget';
 import { optImg, srcSet } from '../../utils/img';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { formatMoney, listPrice, usdEquivalent, type Money } from '../../api/_lib/price';
 import { fetchJsonShared } from '../../utils/sharedFetch';
 import { track as trackEvent } from '../../utils/analytics';
 import { getAttribution } from '../../utils/attribution';
@@ -164,7 +165,10 @@ interface FleetCard {
   builder: string;
   length: string;
   year: number | string;
+  /** Display price in the listing's own currency ("$5,990,000", "€845,000"). */
   price: string;
+  /** USD-equivalent (NormPrice) for ordering — never parse `price`, which may be euros. */
+  priceUsd?: number;
   image: string;
 }
 
@@ -229,8 +233,10 @@ const FALLBACK_FLEET: FleetCard[] = [
   },
 ];
 
-const formatPrice = (n?: number): string =>
-  n && Number.isFinite(n) ? `$${Math.round(n).toLocaleString('en-US')}` : 'Price on request';
+// Order by the USD equivalent; the fallback cards are all USD, so their
+// display string parses to the same number.
+const fleetPriceUsd = (c: FleetCard): number =>
+  c.priceUsd ?? (parseFloat(c.price.replace(/[^0-9.]/g, '')) || 0);
 
 /** Map a raw BoatsGroup feed item (see api/yachts/proxy.ts) to a fleet card. */
 function toFleetCard(it: Record<string, any>): FleetCard | null {
@@ -241,7 +247,6 @@ function toFleetCard(it: Record<string, any>): FleetCard | null {
   if (!id || !images[0]) return null;
   const lengthFt = parseFloat(String(it.LengthOverall ?? it.NominalLength ?? '').replace(/[^0-9.]/g, ''));
   const builder = [it.MakeString, it.Model].filter(Boolean).join(' ').trim();
-  const priceNum = it.PriceHideInd ? undefined : parseFloat(String(it.NormPrice ?? it.Price ?? '').replace(/[^0-9.]/g, ''));
   const title = yachtTitle(it.ModelYear, it.MakeString, it.Model);
   return {
     id,
@@ -250,7 +255,8 @@ function toFleetCard(it: Record<string, any>): FleetCard | null {
     builder: builder || 'FYI Yachts Listing',
     length: Number.isFinite(lengthFt) ? `${Math.round(lengthFt)}'` : '—',
     year: it.ModelYear || '—',
-    price: formatPrice(priceNum),
+    price: formatMoney(listPrice(it)),
+    priceUsd: usdEquivalent(it) ?? 0,
     image: resizeBG(images[0], 900, 675),
   };
 }
@@ -439,8 +445,13 @@ function readTopCache(): TopPick[] | null {
 // listing page's own strips, tripped the proxy's per-IP rate limit.
 interface MenuCard {
   id: string; name: string; year?: number; make?: string; model?: string;
-  lengthFt?: number; priceUsd?: number; image?: string;
+  lengthFt?: number; priceUsd?: number; listPrice?: Money; image?: string;
 }
+
+/** A showcase card's price in its own currency; USD when the server sent none. */
+const menuPrice = (c: MenuCard): string =>
+  formatMoney(c.listPrice ?? (c.priceUsd ? { amount: c.priceUsd, currency: 'USD' } : undefined));
+
 const MENU_SHOWCASE_URL = '/api/yachts/showcase?sections=menuTop,menuSold';
 const fetchMenuShowcase = () =>
   fetchJsonShared<{ menuTop?: MenuCard[]; menuSold?: MenuCard[] }>(MENU_SHOWCASE_URL);
@@ -456,7 +467,7 @@ function fetchTopPicks(): Promise<TopPick[]> {
         .map(c => ({
           id: c.id,
           title: yachtTitle(c.year, c.make, c.model) || c.name || 'Yacht',
-          price: formatPrice(c.priceUsd),
+          price: menuPrice(c),
           length: c.lengthFt ? `${Math.round(c.lengthFt)}'` : '—',
           // Rail slides run ~380px wide, so 900x600 covers 2x at the 3:2 the
           // masters are shot in — nothing is cropped.
@@ -1613,10 +1624,7 @@ function FeaturedFleet() {
           (c) => `${c.builder}|${c.boatName ?? ''}|${c.length}|${c.price}`,
           (c) => Number(c.year),
         )
-          .sort((a, b) => {
-            const num = (c: FleetCard) => parseFloat(c.price.replace(/[^0-9.]/g, '')) || 0;
-            return num(b) - num(a);
-          })
+          .sort((a, b) => fleetPriceUsd(b) - fleetPriceUsd(a))
           .slice(0, 16);
         if (cards.length >= 3) setFleet(cards);
       } catch {

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { getCompareList, clearCompare, removeFromCompare } from '../../services/storageService';
 import { searchPinecone } from '../../services/pineconeService';
 import type { PineconeBoat } from '../../types/search';
-import { formatPrice } from '../../utils/formatters';
+import { formatBoatPrice } from '../../utils/formatters';
 import { BarChart3, X, Trash2, Loader2 } from 'lucide-react';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
@@ -73,7 +73,7 @@ export default function ComparePage() {
 
   const getSpecValue = (boat: PineconeBoat, key: string): string => {
     switch (key) {
-      case 'price': return boat.price ? formatPrice(boat.price) : 'Price on Request';
+      case 'price': return formatBoatPrice(boat);
       case 'year': return boat.year ? String(boat.year) : '—';
       case 'make': return boat.make || '—';
       case 'model': return boat.model || '—';

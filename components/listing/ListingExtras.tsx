@@ -4,6 +4,7 @@ import { track } from '../../utils/analytics';
 import { useStickyCtaFlag } from '../public/useStickyCtaFlag';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
+import { formatMoney, type Money } from '../../api/_lib/price';
 import { fetchJsonShared } from '../../utils/sharedFetch';
 
 /* ------------------------------------------------- city-level map */
@@ -139,7 +140,7 @@ export function AiOverview({ id }: { id: string }) {
 
 interface ShowcaseCard {
   id: string; name: string; year?: number; make?: string; model?: string;
-  lengthFt?: number; priceUsd?: number; image?: string;
+  lengthFt?: number; priceUsd?: number; listPrice?: Money; image?: string;
 }
 interface Showcase { similar?: ShowcaseCard[]; sold?: ShowcaseCard[] }
 
@@ -175,10 +176,9 @@ function useListingShowcase(ref: ListingRef) {
 
 const cardTitle = (c: ShowcaseCard) => yachtTitle(c.year, c.make, c.model) || c.name || 'Yacht';
 const cardName = (c: ShowcaseCard) => boatNameLine(c.name, yachtTitle(c.year, c.make, c.model));
+// Own currency ("€845,000"); USD from priceUsd when the server sent no listPrice.
 const cardPrice = (c: ShowcaseCard) =>
-  c.priceUsd && c.priceUsd > 0
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(c.priceUsd)
-    : 'Price on request';
+  formatMoney(c.listPrice ?? (c.priceUsd ? { amount: c.priceUsd, currency: 'USD' } : undefined));
 
 export function RecentlySoldStrip(props: ListingRef) {
   const { setNode, data } = useListingShowcase(props);

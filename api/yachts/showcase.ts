@@ -39,7 +39,8 @@ function card(b: FleetBoat) {
     make: b.make,
     model: b.model,
     lengthFt: b.lengthFt,
-    priceUsd: b.priceUsd,
+    priceUsd: b.priceUsd, // USD equivalent: ordering only
+    listPrice: b.listPrice, // own currency: what the cards show
     image: b.image,
   };
 }

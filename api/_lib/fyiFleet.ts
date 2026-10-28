@@ -4,6 +4,8 @@
 // `page` but honors `start`, so we page with start offsets (see the
 // pagination gotcha logged in the brain, 2026-07-15).
 
+import { listPrice, type Money } from './price.js';
+
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
 const CACHE_TTL_MS = 15 * 60 * 1000; // sold history moves slowly
@@ -23,6 +25,8 @@ export interface FleetBoat {
   state?: string;
   country?: string;
   image?: string;
+  /** Asking price in the listing's own currency, for display (priceUsd orders). */
+  listPrice?: Money;
   status: 'Active' | 'Sold' | string;
   rep?: string;       // SalesRep.Name — the listing broker
   /** SoldDate from the feed (ISO). Populated on every sold row in FYI's book
@@ -66,6 +70,7 @@ export function normalizeFleetItem(it: Record<string, any>): FleetBoat {
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
     lengthFt: num(it.LengthOverall ?? it.NominalLength),
     priceUsd: it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price),
+    listPrice: listPrice(it),
     category: it.BoatCategoryCode || undefined,
     city: loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : undefined,
     state: loc.BoatStateCode || undefined,

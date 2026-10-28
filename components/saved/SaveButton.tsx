@@ -4,7 +4,7 @@ import { isBoatSaved, saveBoat, unsaveBoat } from '../../services/storageService
 import { syncAlertSubscription } from '../../services/alertService';
 import { useAuth } from '../auth/AuthProvider';
 import type { PineconeBoat } from '../../types/search';
-import { formatPrice } from '../../utils/formatters';
+import { formatBoatPrice } from '../../utils/formatters';
 
 interface Props {
   boat: PineconeBoat;
@@ -31,12 +31,12 @@ export default function SaveButton({ boat, size = 'sm' }: Props) {
         id,
         documentId: boat.documentId,
         title: boat.boatName || [boat.year, boat.make, boat.model].filter(Boolean).join(' ') || 'Unknown',
-        price: boat.price ? formatPrice(boat.price) : 'Price on Request',
+        price: formatBoatPrice(boat),
         image: boat.images?.[0] || '',
         specs: { length: boat.length ? `${Math.round(boat.length)}` : undefined, year: boat.year ? String(boat.year) : undefined, make: boat.make, model: boat.model },
         location: [boat.location?.city, boat.location?.state].filter(Boolean).join(', ') || undefined,
         savedAt: Date.now(),
-        priceAtSave: boat.price ? formatPrice(boat.price) : 'Price on Request',
+        priceAtSave: formatBoatPrice(boat),
       });
       setSaved(true);
     }

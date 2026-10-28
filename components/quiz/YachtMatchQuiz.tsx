@@ -8,6 +8,7 @@ import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track, trackAdsConversion } from '../../utils/analytics';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
+import { formatMoney, listPrice, usdEquivalent } from '../../api/_lib/price';
 import { fetchJsonShared } from '../../utils/sharedFetch';
 
 // "Find Your Yacht Match" — a thumbs-up/down quiz over live inventory.
@@ -33,7 +34,10 @@ interface QuizBoat {
   make?: string;
   year?: number;
   lengthFt?: number;
+  /** USD-equivalent (NormPrice): budget maths only. */
   priceUsd?: number;
+  /** Asking price as shown, in the listing's own currency. */
+  priceLabel: string;
   category?: string;
   image?: string;
   location?: string;
@@ -63,7 +67,8 @@ function mapBoat(it: any): QuizBoat {
     make: it.MakeString || undefined,
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
     lengthFt: num(it.LengthOverall ?? it.NominalLength),
-    priceUsd: it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price),
+    priceUsd: usdEquivalent(it),
+    priceLabel: formatMoney(listPrice(it)),
     category: it.BoatCategoryCode || undefined,
     image: img,
     location: [loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : null, loc.BoatStateCode || loc.BoatCountryID]
@@ -309,10 +314,10 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
   const summary = useMemo(() => {
     const liked = ratings.filter((r) => r.up);
     const withReasons = (r: Rating) =>
-      `${r.boat.name} (${usd(r.boat.priceUsd)}${r.reasons.length ? `; ${r.reasons.join(', ')}` : ''})`;
+      `${r.boat.name} (${r.boat.priceLabel}${r.reasons.length ? `; ${r.reasons.join(', ')}` : ''})`;
     const likeLine = liked.map(withReasons).join('; ') || 'none';
     const passLine = ratings.filter((r) => !r.up && r.reasons.length).map(withReasons).join('; ');
-    const matchLine = matches.map((b) => `${b.name} (${usd(b.priceUsd)})`).join('; ') || 'none';
+    const matchLine = matches.map((b) => `${b.name} (${b.priceLabel})`).join('; ') || 'none';
     const prices = liked.map((r) => r.boat.priceUsd!).filter(Boolean);
     const lengths = liked.map((r) => r.boat.lengthFt!).filter(Boolean);
     const range = prices.length
@@ -430,7 +435,7 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
                 <div className="p-3.5">
                   <p className="text-[15px] font-semibold text-yacht-900">{boat.name}</p>
                   {boat.boatName && <p className="truncate text-[13px] font-light italic text-slate-500">{boat.boatName}</p>}
-                  <p className="text-[15px] font-bold" style={{ color: '#9d7413' }}>{usd(boat.priceUsd)}</p>
+                  <p className="text-[15px] font-bold" style={{ color: '#9d7413' }}>{boat.priceLabel}</p>
                   <p className="text-[12px] text-slate-500">
                     {[boat.lengthFt ? `${Math.round(boat.lengthFt)} ft` : null, boat.location].filter(Boolean).join(' · ')}
                   </p>
@@ -514,7 +519,7 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
                       <div className="p-2">
                         <p className="truncate text-[11.5px] font-semibold text-yacht-900 group-hover:text-yacht-teal">{b.name}</p>
                         {b.boatName && <p className="truncate text-[10.5px] font-light italic text-slate-500">{b.boatName}</p>}
-                        <p className="text-[11.5px] font-bold" style={{ color: '#9d7413' }}>{usd(b.priceUsd)}</p>
+                        <p className="text-[11.5px] font-bold" style={{ color: '#9d7413' }}>{b.priceLabel}</p>
                       </div>
                     </Link>
                   ))}

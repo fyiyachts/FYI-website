@@ -12,6 +12,8 @@ const FEED_CACHE_TTL_MS = 5 * 60 * 1000;
 // — a caller mid-sentence gets no second chance.
 const UPSTREAM_TIMEOUT_MS = 8000;
 
+import { formatMoney, listPrice } from './price.js';
+
 export interface InventoryBoat {
   id: string;
   name: string;
@@ -20,6 +22,8 @@ export interface InventoryBoat {
   year?: number;
   lengthFt?: number;
   priceUsd?: number;
+  /** Asking price as shown, in the listing's own currency ("€845,000"). */
+  priceLabel: string;
   category?: string;   // Power | Sail
   classCode?: string;
   condition?: string;  // New | Used
@@ -65,6 +69,7 @@ function normalize(it: Record<string, any>): InventoryBoat {
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
     lengthFt: num(it.LengthOverall ?? it.NominalLength),
     priceUsd: it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price),
+    priceLabel: formatMoney(listPrice(it)),
     category: it.BoatCategoryCode || undefined,
     classCode: Array.isArray(it.BoatClassCode) ? it.BoatClassCode.join(', ') : it.BoatClassCode || undefined,
     condition: it.SaleClassCode || undefined,
