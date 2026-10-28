@@ -18,7 +18,7 @@ import { renderToString } from 'react-dom/server';
 import { LpShell } from '../components/lp/LpChrome';
 import QuickForm from '../components/lp/QuickForm';
 import { CC_FAQS, CC_HERO, LP_DESCRIPTION, LP_PATH, LP_TITLE, QUICK_FORM, isCenterConsole } from '../components/lp/ccContent';
-import { plsSearch } from '../api/_lib/plsFeed';
+import { plsSearch, PLS_CARD_FIELDS } from '../api/_lib/plsFeed';
 import {
   ALL_CHARTER_VESSELS, CHARTER_FLEET, TERM_CHARTER, CHARTER_INCLUDES,
   CHARTER_FROM_PRICE, CHARTER_PHONE_DISPLAY, CHARTER_EMAIL, isTermVessel,
@@ -1166,8 +1166,14 @@ export async function attachLandingShells(routes: SeoRoute[], inv: { fyi: Public
   const manual = MANUAL_LISTINGS.map(normalizePublicBoat).filter((b): b is PublicBoat => b !== null);
   const own = [...inv.fyi, ...manual];
   const ownCc = own.filter((b) => isCenterConsole(b.classCode)).length;
+  // The live search's exact query, fields included: PLS answers "Service
+  // Unavailable" to a length-sorted search that asks for DocumentID alone.
+  const search = () => plsSearch(
+    { class: 'Center Consoles', sort: 'Length|desc', rows: '24' },
+    { fields: PLS_CARD_FIELDS, cardOnly: true },
+  );
   try {
-    const page = await plsSearch({ class: 'Center Consoles', sort: 'Length|desc', rows: '24' }, { fields: 'DocumentID' });
+    const page = await search().catch(() => search());
     if (!page.numResults) {
       console.warn(`[seoData] landing count: PLS returned no results (BOATS_PLS_API_KEY ${process.env.BOATS_PLS_API_KEY ? 'set' : 'not set'})`);
       return null;
