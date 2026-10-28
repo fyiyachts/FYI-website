@@ -121,32 +121,38 @@ export async function submitCcLead(
   guard: { company: string; formOpenedAt: number },
 ): Promise<{ ok: boolean; error?: string }> {
   const l = lead.listing;
-  try {
-    const res = await fetch('/api/contact/broker', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        yacht: l
-          ? { title: l.title, price: l.price, year: l.year, make: l.make, model: l.model, length: l.lengthFt ? `${l.lengthFt} ft` : undefined, location: l.location }
-          : { title: LP_CONTEXT },
-        name: lead.name,
-        email: lead.email,
-        phone: lead.phone,
-        message: composeMessage(lead),
-        attribution: getAttribution(),
-        leadSource: LEAD_SOURCE,
-        ...guard,
-      }),
-    });
-    if (res.ok) {
-      fireConversions(lead);
-      return { ok: true };
+  const body = JSON.stringify({
+    yacht: l
+      ? { title: l.title, price: l.price, year: l.year, make: l.make, model: l.model, length: l.lengthFt ? `${l.lengthFt} ft` : undefined, location: l.location }
+      : { title: LP_CONTEXT },
+    name: lead.name,
+    email: lead.email,
+    phone: lead.phone,
+    message: composeMessage(lead),
+    attribution: getAttribution(),
+    leadSource: LEAD_SOURCE,
+    ...guard,
+  });
+  // One automatic retry on a dropped connection or a server error, so a blip
+  // never reaches the visitor. Safe to repeat: a lead that did land makes the
+  // retry a duplicate, which the endpoint answers without sending again; one
+  // that didn't land has its duplicate claim released for the retry.
+  let res: Response | null = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      res = await fetch('/api/contact/broker', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      if (res.status < 500) break;
+    } catch {
+      res = null;
     }
-    // A 4xx says what to fix ("Please enter a valid email address"); a 5xx
-    // message is no use to a visitor, so they get the generic line instead.
-    const detail = res.status < 500 ? await res.json().catch(() => null) : null;
-    return { ok: false, error: typeof detail?.error === 'string' ? detail.error : undefined };
-  } catch {
-    return { ok: false };
+    if (attempt === 1) await new Promise((r) => setTimeout(r, 1500));
   }
+  if (res?.ok) {
+    fireConversions(lead);
+    return { ok: true };
+  }
+  // A 4xx says what to fix ("Please enter a valid email address"); a 5xx or a
+  // dead connection is no use to a visitor, so they get the generic line.
+  const detail = res && res.status < 500 ? await res.json().catch(() => null) : null;
+  return { ok: false, error: typeof detail?.error === 'string' ? detail.error : undefined };
 }

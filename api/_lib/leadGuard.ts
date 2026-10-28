@@ -59,6 +59,12 @@ export interface LeadGuardVerdict {
   flags: string[];
   /** Cleaned values to deliver in place of the raw ones. */
   clean: { name: string; email: string; phone: string | null; message: string };
+  /**
+   * The duplicate-window key this submission claimed. The caller hands it to
+   * releaseDuplicate() when delivery fails, so the visitor's retry is
+   * delivered rather than dropped as a duplicate of a lead that never landed.
+   */
+  dupKey?: string;
 }
 
 /* ------------------------------------------------------------- constants */
@@ -184,6 +190,25 @@ async function kvCount(key: string, windowSec: number): Promise<number | null> {
 async function bump(key: string, windowSec: number): Promise<number> {
   const viaKv = await kvCount(`leadguard:${key}`, windowSec);
   return viaKv ?? memCount(key, windowSec);
+}
+
+/**
+ * Forget a duplicate-window claim. The window is claimed before delivery, so
+ * a lead that then fails to deliver would otherwise turn the visitor's "try
+ * again" into a silent drop — a thank-you on screen and no lead anywhere.
+ */
+export async function releaseDuplicate(key: string | undefined): Promise<void> {
+  if (!key) return;
+  memHits.delete(key);
+  if (!KV_URL || !KV_TOKEN) return;
+  try {
+    await fetch(`${KV_URL}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['DEL', `leadguard:${key}`]]),
+      signal: AbortSignal.timeout(1500),
+    });
+  } catch { /* the key expires on its own within the window */ }
 }
 
 /* --------------------------------------------------------------- helpers */
@@ -411,10 +436,11 @@ export async function checkLead(req: any, input: LeadGuardInput): Promise<LeadGu
     }
 
     /* 6. duplicate window ------------------------------------------------ */
-    const dupCount = await bump(`dup:${digest(`${emailKey}|${name}|${message}`)}`, DUPLICATE_WINDOW_SEC);
+    const dupKey = `dup:${digest(`${emailKey}|${name}|${message}`)}`;
+    const dupCount = await bump(dupKey, DUPLICATE_WINDOW_SEC);
     if (dupCount > 1) return silentDrop('duplicate submission within 10 minutes');
 
-    return { ok: true, status: 200, flags, clean: { name, email, phone, message } };
+    return { ok: true, status: 200, flags, clean: { name, email, phone, message }, dupKey };
   } catch (err) {
     // Fail open. A bug in this file must never cost the business a lead.
     console.error('[leadGuard] check failed open:', err);

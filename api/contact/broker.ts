@@ -2,7 +2,7 @@ import { parseJsonBody, fail, ok, methodNotAllowed } from '../_lib/http.js';
 import { getTransporter, isEmailConfigured, getSmtpUser } from '../_lib/email.js';
 import { parseAttribution, attributionSummary } from '../_lib/attribution.js';
 import { recordLeadSizeByEmail } from '../_lib/fyiLeadSize.js';
-import { checkLead, clientIp } from '../_lib/leadGuard.js';
+import { checkLead, clientIp, releaseDuplicate } from '../_lib/leadGuard.js';
 import { syncToFyiHubspot } from '../_lib/briannaLead.js';
 
 const HS_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN || process.env.HUBSPOT_FYI_TOKEN || '';
@@ -24,9 +24,44 @@ const esc = (v: unknown) =>
 // counted. Each value must be an option of HubSpot's lead_source dropdown.
 const PAGE_LEAD_SOURCES = new Set(['ChatGPT Ads']);
 
+// Room for one email retry and the HubSpot fallback below.
+export const maxDuration = 60;
+
+/** Give up waiting on a delivery channel after `ms`; the other channel may still land the lead. */
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${what} timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
+/**
+ * Last resort for a lead neither email nor HubSpot took: keep it where it can
+ * be recovered — the function log, and a capped list in the site's KV store
+ * (Upstash: leads:undelivered).
+ */
+async function keepUndelivered(lead: Record<string, unknown>): Promise<void> {
+  const entry = JSON.stringify({ ...lead, at: new Date().toISOString() });
+  console.error(`[contact/broker] UNDELIVERED LEAD ${entry}`);
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return;
+  try {
+    await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['LPUSH', 'leads:undelivered', entry], ['LTRIM', 'leads:undelivered', '0', '499']]),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch { /* the log line above still has it */ }
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return methodNotAllowed(res);
 
+  // The duplicate-window claim this lead made; released if delivery fails so
+  // the visitor's retry is delivered instead of dropped as a duplicate.
+  let dupKey: string | undefined;
   try {
     const body = parseJsonBody(req);
     const { yacht, attribution } = body;
@@ -45,8 +80,12 @@ export default async function handler(req: any, res: any) {
       if (verdict.silent) return ok(res, { sent: true });
       return fail(res, verdict.error || 'Your message could not be submitted.', verdict.status);
     }
+    dupKey = verdict.dupKey;
     const { name, email, phone, message } = verdict.clean;
-    if (!message) return fail(res, 'Name, email, and message are required', 400);
+    if (!message) {
+      await releaseDuplicate(dupKey);
+      return fail(res, 'Name, email, and message are required', 400);
+    }
     if (verdict.flags.length) {
       console.log(`[contact/broker] delivering flagged lead: ${verdict.flags.join('; ')}`);
     }
@@ -103,17 +142,21 @@ export default async function handler(req: any, res: any) {
     // at least one delivers.
     let emailOk = false;
     if (isEmailConfigured()) {
-      try {
-        await getTransporter().sendMail({
-          from: `"FYI Yachts Portal" <${getSmtpUser()}>`,
-          to: 'sales@fyiyachts.com',
-          replyTo: email,
-          subject: `${leadSource === 'Website' ? '' : `[${leadSource}] `}Inquiry: ${yacht.title} — ${yacht.price || 'Price on Request'}`,
-          html,
-        });
-        emailOk = true;
-      } catch (err) {
-        console.error('[contact/broker] SMTP send failed:', err);
+      const send = () => withTimeout(getTransporter().sendMail({
+        from: `"FYI Yachts Portal" <${getSmtpUser()}>`,
+        to: 'sales@fyiyachts.com',
+        replyTo: email,
+        subject: `${leadSource === 'Website' ? '' : `[${leadSource}] `}Inquiry: ${yacht.title} — ${yacht.price || 'Price on Request'}`,
+        html,
+      }), 15_000, 'SMTP send');
+      // One retry: Gmail SMTP refuses the odd connection.
+      for (let attempt = 1; attempt <= 2 && !emailOk; attempt++) {
+        try {
+          await send();
+          emailOk = true;
+        } catch (err) {
+          console.error(`[contact/broker] SMTP send attempt ${attempt} failed:`, err);
+        }
       }
     } else {
       console.error('[contact/broker] SMTP not configured — relying on HubSpot only');
@@ -122,21 +165,33 @@ export default async function handler(req: any, res: any) {
     // Upsert the contact into FYI HubSpot with the inquiry as a note.
     let hubspotOk = false;
     if (HS_TOKEN) {
-      try {
-        await syncToFyiHubspot(
-          {
-            name: String(name),
-            email: String(email),
-            phone: phone ? String(phone) : undefined,
-            interest: `Inquiry: ${yacht.title}${yacht.price ? ` — ${yacht.price}` : ''}\n\n${message}`
-              .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
-            attribution: attr,
-          },
-          { leadSource, noteTitle: leadSource === 'Website' ? 'Website yacht inquiry' : `${leadSource} inquiry` },
-        );
-        hubspotOk = true;
-      } catch (err) {
-        console.error('[contact/broker] HubSpot sync failed:', err);
+      const sync = (source: string) => withTimeout(syncToFyiHubspot(
+        {
+          name: String(name),
+          email: String(email),
+          phone: phone ? String(phone) : undefined,
+          interest: `Inquiry: ${yacht.title}${yacht.price ? ` — ${yacht.price}` : ''}\n\n${message}`
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
+          attribution: attr,
+        },
+        { leadSource: source, noteTitle: leadSource === 'Website' ? 'Website yacht inquiry' : `${leadSource} inquiry` },
+      ), 20_000, 'HubSpot sync');
+      // HubSpot outages are already retried inside syncToFyiHubspot. What it
+      // can't fix is a rejected value: lead_source is a dropdown, and a page's
+      // own source fails until that option exists. Then the contact is filed as
+      // "Website" rather than not at all — the note still names the page.
+      const sources = leadSource === 'Website' ? ['Website'] : [leadSource, 'Website'];
+      for (const source of sources) {
+        try {
+          await sync(source);
+          hubspotOk = true;
+          if (source !== leadSource) {
+            console.error(`[contact/broker] HubSpot took the lead as "${source}" — check "${leadSource}" is a lead_source option`);
+          }
+          break;
+        } catch (err) {
+          console.error(`[contact/broker] HubSpot sync (${source}) failed:`, err);
+        }
       }
     }
 
@@ -153,13 +208,18 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    if (!emailOk && !hubspotOk) return fail(res, 'Inquiry could not be delivered');
+    if (!emailOk && !hubspotOk) {
+      await releaseDuplicate(dupKey);
+      await keepUndelivered({ name, email, phone, message, yacht: yacht.title, price: yacht.price, leadSource });
+      return fail(res, 'Inquiry could not be delivered');
+    }
     if (!emailOk || !hubspotOk) {
       console.error(`[contact/broker] partial delivery: email=${emailOk} hubspot=${hubspotOk}`);
     }
     return ok(res, { sent: true });
   } catch (err) {
     console.error('[contact/broker] error:', err);
+    await releaseDuplicate(dupKey);
     return fail(res, err);
   }
 }
