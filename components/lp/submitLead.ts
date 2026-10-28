@@ -1,22 +1,18 @@
 // Lead submission for the ChatGPT Ads center console landing page.
 //
-// Primary path: the HubSpot form "ChatGPT Ads – Center Console" (portal
-// 3826631) through the Forms API v3, so the lead lands with lead_source
-// "ChatGPT Ads", the step answers and the ad's UTMs on the contact, and the
-// HubSpot workflow routes it to sales@ (no owner is set here).
-//
-// Fallback: /api/contact/broker — the site's existing lead endpoint, which
-// emails sales@ and syncs the contact to HubSpot. Used while
-// VITE_HUBSPOT_CC_FORM_GUID is unset and whenever the HubSpot submit fails,
-// so no lead is ever dropped. The answers and UTMs ride in its message body.
+// Goes through /api/contact/broker, the site's lead endpoint: it emails
+// sales@ ("[ChatGPT Ads] Inquiry: …") and upserts the HubSpot contact with
+// lead_source "ChatGPT Ads". Every step answer, the boat asked about and the
+// ad's UTMs are written into the message, which lands as the note on the
+// contact's activity — no custom HubSpot properties or form to maintain
+// (client, 2026-10-28). Routing to sales@ stays with HubSpot; no owner is set.
 
 import { getAttribution } from '../../utils/attribution';
 import { track, trackAdsConversion } from '../../utils/analytics';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { LP_CONTEXT, LP_PATH } from './ccContent';
 
-const PORTAL = '3826631';
-const FORM_GUID = (import.meta.env.VITE_HUBSPOT_CC_FORM_GUID ?? '').trim();
+/** Must match an option of FYI HubSpot's lead_source dropdown. */
 export const LEAD_SOURCE = 'ChatGPT Ads';
 
 export interface ListingOfInterest {
@@ -31,117 +27,43 @@ export interface ListingOfInterest {
 }
 
 export interface CcLead {
-  size: string;
-  budget: string;
-  use: string;
-  owns: string;
-  currentBoat: string;
+  /** quick: the hero / pop-up contact form. details: the optional step form. */
+  kind: 'quick' | 'details';
   name: string;
   email: string;
   phone: string;
-  message: string;
+  size?: string;
+  budget?: string;
+  use?: string;
+  owns?: string;
+  currentBoat?: string;
+  message?: string;
   listing?: ListingOfInterest | null | undefined;
 }
 
-/** "Jane van der Berg" → ["Jane", "van der Berg"]; one word → lastname empty. */
-export function splitName(full: string): [string, string] {
-  const parts = full.trim().split(/\s+/);
-  return [parts[0] ?? '', parts.slice(1).join(' ')];
-}
+// Always the canonical host: the lead guard lets fyiyachts.com links through,
+// and a preview or localhost URL is no use to a broker anyway.
+const listingLine = (l: ListingOfInterest): string =>
+  `${l.title}${l.price ? ` — ${l.price}` : ''} — https://fyiyachts.com/listing/${l.id}`;
 
-const listingLine = (l: ListingOfInterest | null | undefined): string =>
-  l ? `${l.title}${l.price ? ` — ${l.price}` : ''} — ${window.location.origin}/listing/${l.id}` : '';
-
-function hutk(): string | undefined {
-  const m = /(?:^|;\s*)hubspotutk=([^;]+)/.exec(document.cookie);
-  return m ? decodeURIComponent(m[1]) : undefined;
-}
-
-async function submitToHubspot(lead: CcLead): Promise<boolean> {
-  if (!FORM_GUID) return false;
+/** The note a broker reads: one line per answer. */
+function composeMessage(lead: CcLead): string {
   const a = getAttribution();
-  const [firstname, lastname] = splitName(lead.name);
-  const props: Record<string, string | undefined> = {
-    firstname,
-    lastname,
-    email: lead.email,
-    phone: lead.phone,
-    message: lead.message,
-    cc_size_range: lead.size,
-    cc_budget_range: lead.budget,
-    cc_primary_use: lead.use,
-    owns_boat: lead.owns,
-    current_boat_details: lead.currentBoat,
-    listing_of_interest: listingLine(lead.listing),
-    lead_source: LEAD_SOURCE,
-    utm_source: a.utm_source,
-    utm_medium: a.utm_medium,
-    utm_campaign: a.utm_campaign,
-    utm_content: a.utm_content,
-  };
-  const context: Record<string, string> = {
-    pageUri: window.location.href.slice(0, 1000),
-    pageName: document.title || 'Center Console Boats for Sale',
-  };
-  const tk = hutk();
-  if (tk) context.hutk = tk;
-  try {
-    const res = await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${PORTAL}/${FORM_GUID}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fields: Object.entries(props)
-          .filter(([, v]) => v)
-          .map(([name, value]) => ({ objectTypeId: '0-1', name, value })),
-        context,
-      }),
-    });
-    if (!res.ok) console.warn('[lp] HubSpot submit failed', res.status, await res.text().catch(() => ''));
-    return res.ok;
-  } catch (err) {
-    console.warn('[lp] HubSpot submit failed', err);
-    return false;
-  }
-}
-
-async function submitToBroker(lead: CcLead, guard: { company: string; formOpenedAt: number }): Promise<{ ok: boolean; error?: string }> {
-  const a = getAttribution();
-  const l = lead.listing;
-  const lines = [
-    `${LP_CONTEXT} lead (lead source: ${LEAD_SOURCE})`,
-    `Size: ${lead.size}`,
-    `Budget: ${lead.budget}`,
-    `Primary use: ${lead.use}`,
-    `Owns a boat: ${lead.owns}${lead.currentBoat ? ` — ${lead.currentBoat}` : ''}`,
-    l && `Listing of interest: ${listingLine(l)}`,
-    `UTM: ${['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'].map((k) => `${k}=${a[k as keyof typeof a] ?? ''}`).join(' ')}`,
+  const utm = (['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'] as const)
+    .filter((k) => a[k])
+    .map((k) => `${k}=${a[k]}`)
+    .join(' ');
+  const form = lead.kind === 'quick' ? 'contact form' : 'match questions';
+  return [
+    `${LP_CONTEXT} lead — ${form} (lead source: ${LEAD_SOURCE}, page ${LP_PATH})`,
+    lead.size && `Size: ${lead.size}`,
+    lead.budget && `Budget: ${lead.budget}`,
+    lead.use && `Primary use: ${lead.use}`,
+    lead.owns && `Owns a boat: ${lead.owns}${lead.currentBoat ? ` — ${lead.currentBoat}` : ''}`,
+    lead.listing && `Listing of interest: ${listingLine(lead.listing)}`,
+    utm && `UTM: ${utm}`,
     lead.message && `\nMessage: ${lead.message}`,
-  ].filter(Boolean);
-  try {
-    const res = await fetch('/api/contact/broker', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        yacht: l
-          ? { title: l.title, price: l.price, year: l.year, make: l.make, model: l.model, length: l.lengthFt ? `${l.lengthFt} ft` : undefined, location: l.location }
-          : { title: LP_CONTEXT },
-        name: lead.name,
-        email: lead.email,
-        phone: lead.phone,
-        message: lines.join('\n'),
-        attribution: a,
-        leadSource: LEAD_SOURCE,
-        ...guard,
-      }),
-    });
-    if (res.ok) return { ok: true };
-    // A 4xx says what to fix ("Please enter a valid email address"); a 5xx
-    // message is no use to a visitor, so they get the generic line instead.
-    const detail = res.status < 500 ? await res.json().catch(() => null) : null;
-    return { ok: false, error: typeof detail?.error === 'string' ? detail.error : undefined };
-  } catch {
-    return { ok: false };
-  }
+  ].filter(Boolean).join('\n');
 }
 
 /**
@@ -165,28 +87,66 @@ export function trackPhoneClick(placement: string): void {
   track('phone_click', { context: LP_CONTEXT, placement, page_path: LP_PATH });
 }
 
-/** Every conversion tag, once per successful lead. */
-function fireConversions(email: string, via: string): void {
-  track('generate_lead', { context: LP_CONTEXT, page_path: LP_PATH, lead_source: LEAD_SOURCE, method: via });
-  trackAdsConversion(LP_CONTEXT);
-  // Meta Lead — fires when a Meta pixel is on the page (none is today).
-  try { window.fbq?.('track', 'Lead'); } catch { /* noop */ }
-  trackOpenAiLead();
-  identifyVisitor(email);
+const CONVERTED_KEY = 'fyi_lp_cc_converted';
+
+/**
+ * True for the visit's first lead. A visitor who sends the quick form and then
+ * the step form is one conversion, not two, in GA4 and the ad platforms.
+ */
+function firstLeadThisVisit(): boolean {
+  try {
+    if (sessionStorage.getItem(CONVERTED_KEY)) return false;
+    sessionStorage.setItem(CONVERTED_KEY, '1');
+  } catch { /* storage unavailable: count it */ }
+  return true;
 }
 
-/** Submit a lead; true once it has landed somewhere a broker will see it. */
+/** Every conversion tag, once per visit; follow-up details get their own event. */
+function fireConversions(lead: CcLead): void {
+  if (firstLeadThisVisit()) {
+    track('generate_lead', { context: LP_CONTEXT, page_path: LP_PATH, lead_source: LEAD_SOURCE, form: lead.kind });
+    trackAdsConversion(LP_CONTEXT);
+    // Meta Lead — fires when a Meta pixel is on the page (none is today).
+    try { window.fbq?.('track', 'Lead'); } catch { /* noop */ }
+    trackOpenAiLead();
+  } else {
+    track('lp_lead_details', { context: LP_CONTEXT, form: lead.kind });
+  }
+  identifyVisitor(lead.email);
+}
+
+/** Submit a lead; ok once it has landed somewhere a broker will see it. */
 export async function submitCcLead(
   lead: CcLead,
   guard: { company: string; formOpenedAt: number },
 ): Promise<{ ok: boolean; error?: string }> {
-  // A filled honeypot goes to the site endpoint, whose lead guard drops it
-  // quietly; HubSpot's form endpoint has no such screen.
-  if (!guard.company && await submitToHubspot(lead)) {
-    fireConversions(lead.email, 'hubspot');
-    return { ok: true };
+  const l = lead.listing;
+  try {
+    const res = await fetch('/api/contact/broker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        yacht: l
+          ? { title: l.title, price: l.price, year: l.year, make: l.make, model: l.model, length: l.lengthFt ? `${l.lengthFt} ft` : undefined, location: l.location }
+          : { title: LP_CONTEXT },
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        message: composeMessage(lead),
+        attribution: getAttribution(),
+        leadSource: LEAD_SOURCE,
+        ...guard,
+      }),
+    });
+    if (res.ok) {
+      fireConversions(lead);
+      return { ok: true };
+    }
+    // A 4xx says what to fix ("Please enter a valid email address"); a 5xx
+    // message is no use to a visitor, so they get the generic line instead.
+    const detail = res.status < 500 ? await res.json().catch(() => null) : null;
+    return { ok: false, error: typeof detail?.error === 'string' ? detail.error : undefined };
+  } catch {
+    return { ok: false };
   }
-  const fallback = await submitToBroker(lead, guard);
-  if (fallback.ok) fireConversions(lead.email, 'broker');
-  return fallback;
 }

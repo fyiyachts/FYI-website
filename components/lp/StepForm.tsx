@@ -1,43 +1,22 @@
-// The "Get matched" step form: one question per screen, tap a tile and it
-// moves on. Four taps and a contact screen — about 45 seconds.
+// The optional step form at the bottom of the landing page: one question per
+// screen, tap a tile and it moves on. Four taps and a contact screen — about
+// 45 seconds. The quick form in the hero is the main path; this one adds the
+// detail a broker needs to match boats.
 //
-// Everything typed is kept in sessionStorage as it changes, so a failed
-// submit, a reload or closing the listing modal never loses an answer; the
-// draft is cleared only once a lead has landed.
+// Everything typed is kept in the shared draft (leadForm.ts) as it changes, so
+// a failed submit or a reload never loses an answer, and name/email/phone
+// typed in the quick form are already filled in here. The draft is cleared
+// once this form's lead has landed.
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, Check, Phone } from 'lucide-react';
 import { HoneypotField, guardFields, useFormGuard } from '../../utils/formGuard';
 import { BUDGET_BANDS, LP_PHONE_DISPLAY, LP_PHONE_TEL, OWNS, SIZE_BANDS, USES } from './ccContent';
-import { submitCcLead, type ListingOfInterest } from './submitLead';
-
-export interface Draft {
-  size: string;
-  budget: string;
-  use: string;
-  owns: string;
-  currentBoat: string;
-  name: string;
-  email: string;
-  phone: string;
-  message: string;
-}
-
-const EMPTY: Draft = { size: '', budget: '', use: '', owns: '', currentBoat: '', name: '', email: '', phone: '', message: '' };
-const DRAFT_KEY = 'fyi_lp_cc_draft';
-
-function loadDraft(): Draft {
-  try {
-    const raw = sessionStorage.getItem(DRAFT_KEY);
-    return raw ? { ...EMPTY, ...(JSON.parse(raw) as Partial<Draft>) } : EMPTY;
-  } catch { return EMPTY; }
-}
-function saveDraft(d: Draft): void {
-  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch { /* storage unavailable */ }
-}
-function clearDraft(): void {
-  try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* storage unavailable */ }
-}
+import {
+  DRAFT_EVENT, INPUT_CLS as input, LABEL_CLS as label, SUBMIT_CLS as submitBtn,
+  clearDraft, loadDraft, saveDraft, validateContact, type ContactErrors, type Draft,
+} from './leadForm';
+import { submitCcLead } from './submitLead';
 
 type ChoiceKey = 'size' | 'budget' | 'use' | 'owns';
 const CHOICES: { key: ChoiceKey; question: string; options: string[] }[] = [
@@ -55,13 +34,10 @@ const firstOpenStep = (d: Draft) => {
   return i === -1 ? CHOICES.length : i;
 };
 
-type Errors = Partial<Record<'name' | 'email' | 'phone' | 'consent', string>>;
+type Errors = ContactErrors;
 
 function validate(d: Draft, consent: boolean): Errors {
-  const e: Errors = {};
-  if (d.name.trim().length < 2) e.name = 'Please enter your name.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim())) e.email = 'Please enter a valid email address.';
-  if (d.phone.replace(/\D/g, '').length < 10) e.phone = 'Please enter a phone number with area code.';
+  const e = validateContact(d);
   if (!consent) e.consent = 'Please tick the box so a specialist can contact you.';
   return e;
 }
@@ -70,25 +46,14 @@ const tile = (on: boolean) =>
   `flex min-h-[56px] w-full items-center justify-between gap-3 rounded-lg border px-5 py-4 text-left text-[15px] font-light text-yacht-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yacht-brand focus-visible:ring-offset-2 ${
     on ? 'border-yacht-brand bg-yacht-brand/[0.06]' : 'border-yacht-900/20 bg-white hover:border-yacht-900/50'
   }`;
-const input =
-  'w-full rounded-lg border border-yacht-900/25 bg-white px-4 py-3.5 text-base font-light text-yacht-900 placeholder:text-yacht-900/50 focus:border-yacht-brand focus:outline-none focus:ring-2 focus:ring-yacht-brand/30 aria-[invalid=true]:border-yacht-brand';
-const label = 'mb-2 block text-[11px] font-semibold uppercase tracking-[0.2em] text-yacht-900/80';
-const submitBtn =
-  'inline-flex min-h-[56px] w-full items-center justify-center bg-yacht-brand px-7 text-[11px] font-semibold uppercase tracking-[0.2em] text-white transition-colors hover:bg-yacht-brand-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yacht-brand focus-visible:ring-offset-2 disabled:opacity-60';
 
-export default function StepForm({
-  listing, prefill, onPhoneClick, placement,
-}: {
-  /** The boat a card's "Request info" opened the form for. */
-  listing?: ListingOfInterest | null;
-  /** Answers known from that boat (its size and price bands). */
-  prefill?: Partial<Draft>;
+export default function StepForm({ onPhoneClick, placement }: {
   onPhoneClick: (placement: string) => void;
-  /** Where this form sits, for the phone-click event ("form", "modal"). */
+  /** Where this form sits, for the phone-click event. */
   placement: string;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => ({ ...loadDraft(), ...prefill }));
-  const [step, setStep] = useState(() => firstOpenStep({ ...loadDraft(), ...prefill }));
+  const [draft, setDraft] = useState<Draft>(loadDraft);
+  const [step, setStep] = useState(() => firstOpenStep(loadDraft()));
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
@@ -100,6 +65,15 @@ export default function StepForm({
   const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => { if (status !== 'sent') saveDraft(draft); }, [draft, status]);
+  // Contact details sent from the quick form fill any this form doesn't have yet.
+  useEffect(() => {
+    const fill = () => {
+      const d = loadDraft();
+      setDraft((cur) => ({ ...cur, name: cur.name || d.name, email: cur.email || d.email, phone: cur.phone || d.phone }));
+    };
+    window.addEventListener(DRAFT_EVENT, fill);
+    return () => window.removeEventListener(DRAFT_EVENT, fill);
+  }, []);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   // Move focus to the new question after a step change the visitor made, so
   // keyboard and screen-reader users land on it; never on first render.
@@ -130,7 +104,7 @@ export default function StepForm({
       document.getElementById(`${uid}-${firstBad}`)?.focus();
       return;
     }
-    // A step answer can be missing if the visitor skipped ahead via a card; ask it.
+    // Every question must be answered before the contact screen sends.
     const open = firstOpenStep(draft);
     if (open < CHOICES.length) { go(open); return; }
     setStatus('sending');
@@ -142,7 +116,7 @@ export default function StepForm({
         phone: draft.phone.trim(),
         message: draft.message.trim(),
         currentBoat: draft.owns === OWNS_NO ? '' : draft.currentBoat.trim(),
-        listing: listing ?? null,
+        kind: 'details',
       },
       guardFields(guard),
     );
@@ -245,9 +219,9 @@ export default function StepForm({
           <h3 ref={headingRef} tabIndex={-1} className="text-2xl font-light tracking-wide text-yacht-900 focus:outline-none sm:text-[1.75rem]">
             Where should we send your matches?
           </h3>
-          {(answered.length > 0 || listing) && (
+          {answered.length > 0 && (
             <p className="mt-3 text-[14px] font-light leading-6 text-yacht-900/75">
-              {[listing?.title, ...answered.slice(0, 3)].filter(Boolean).join(' · ')}
+              {answered.slice(0, 3).join(' · ')}
             </p>
           )}
           <div className="mt-6 grid gap-5 sm:grid-cols-2">

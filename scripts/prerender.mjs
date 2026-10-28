@@ -62,7 +62,7 @@ const routes = buildRoutes(newsIndex);
 const inventory = await fetchBuildInventory();
 const hubsTouched = attachHubInventory(routes, inventory);
 console.log(`inventory: ${inventory.fyi.length} FYI + ${inventory.worldwide.length} worldwide listing(s) → baked into ${hubsTouched} hub page(s)`);
-const lpCount = attachLandingShells(routes, inventory);
+const lpCount = await attachLandingShells(routes, inventory);
 console.log(`landing pages: ${lpCount ?? 'no'} center console count baked in`);
 
 // index.html carries static description/OG/Twitter meta for the bare domain and

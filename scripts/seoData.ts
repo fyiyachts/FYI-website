@@ -16,7 +16,9 @@ import { getBrandDetail } from '../components/public/brandContent';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { LpShell } from '../components/lp/LpChrome';
-import { CC_FAQS, CC_HERO, LP_DESCRIPTION, LP_PATH, LP_TITLE, isCenterConsole } from '../components/lp/ccContent';
+import QuickForm from '../components/lp/QuickForm';
+import { CC_FAQS, CC_HERO, LP_DESCRIPTION, LP_PATH, LP_TITLE, QUICK_FORM, isCenterConsole } from '../components/lp/ccContent';
+import { plsSearch } from '../api/_lib/plsFeed';
 import {
   ALL_CHARTER_VESSELS, CHARTER_FLEET, TERM_CHARTER, CHARTER_INCLUDES,
   CHARTER_FROM_PRICE, CHARTER_PHONE_DISPLAY, CHARTER_EMAIL, isTermVessel,
@@ -1138,26 +1140,41 @@ export { BRAND_PAGES, CATEGORY_PAGES, FYI_TEAM };
 export const MANUAL_LISTING_COUNT = MANUAL_LISTINGS.length;
 
 /**
- * The landing page's header + hero as HTML the app hydrates (index.tsx), so
- * renderToString — hydration needs its text-node markers. React also emits a
- * <link rel=preload> for the eager logo image ahead of the markup; that node
- * isn't part of the component tree hydration walks, so it is dropped.
+ * The landing page's header + hero (with its quick form) as HTML the app
+ * hydrates (index.tsx), so renderToString — hydration needs its text-node
+ * markers. The tree must match the page's first client render, props
+ * included. React also emits a <link rel=preload> for the eager logo image
+ * ahead of the markup; that node isn't part of the component tree hydration
+ * walks, so it is dropped.
  */
 function landingShell(count: number | null): string {
-  return renderToString(createElement(LpShell, { hero: { ...CC_HERO, count } }))
+  const form = createElement(QuickForm, { ...QUICK_FORM, placement: 'hero' });
+  return renderToString(createElement(LpShell, { hero: { ...CC_HERO, count, form } }))
     .replace(/^(?:<link [^>]*>)+/, '');
 }
 
 /**
- * Bake the live center console count into the landing page's trust strip —
- * the same count the page computes on load (FYI's book plus the hand-entered
- * listings). Left out, never guessed, when the build feed didn't answer.
+ * Bake the live center console count into the landing page's trust strip,
+ * computed the way the page computes it: FYI's own center consoles (feed +
+ * hand-entered) plus PLS's co-brokerage total, less FYI's own boats on PLS's
+ * first page (the co-brokerage search drops those, page by page). Left out,
+ * never guessed, when either feed didn't answer at build time.
  */
-export function attachLandingShells(routes: SeoRoute[], inv: { fyi: PublicBoat[] }): number | null {
+export async function attachLandingShells(routes: SeoRoute[], inv: { fyi: PublicBoat[] }): Promise<number | null> {
   const r = routes.find((x) => x.path === LP_PATH);
   if (!r || !inv.fyi.length) return null;
   const manual = MANUAL_LISTINGS.map(normalizePublicBoat).filter((b): b is PublicBoat => b !== null);
-  const count = [...inv.fyi, ...manual].filter((b) => isCenterConsole(b.classCode)).length;
-  if (count) r.shellHtml = landingShell(count);
-  return count || null;
+  const own = [...inv.fyi, ...manual];
+  const ownCc = own.filter((b) => isCenterConsole(b.classCode)).length;
+  try {
+    const page = await plsSearch({ class: 'Center Consoles', sort: 'Length|desc', rows: '24' }, { fields: 'DocumentID' });
+    if (!page.numResults) return null;
+    const ids = new Set(own.map((b) => b.id));
+    const dropped = page.results.filter((x) => ids.has(String(x.DocumentID))).length;
+    const count = ownCc + page.numResults - dropped;
+    r.shellHtml = landingShell(count);
+    return count;
+  } catch {
+    return null;
+  }
 }

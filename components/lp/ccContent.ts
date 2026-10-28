@@ -18,8 +18,14 @@ export const CC_HERO = {
   eyebrow: 'FYI Yachts · Center Console Specialists',
   h1: 'Center Console Boats for Sale',
   subhead: 'Exclusive Miami inventory, shown by brokers who know these boats inside out.',
-  ctaLabel: 'Get matched with a center console',
   countLabel: 'center consoles',
+};
+
+/** The hero's quick contact form. */
+export const QUICK_FORM = {
+  idPrefix: 'lp-qf',
+  title: 'Talk to a center console specialist',
+  intro: 'Three details. We’ll take it from there.',
 };
 
 /** A center console in FYI's book, by the feed's BoatClassCode. */
@@ -48,11 +54,6 @@ export const OWNS = [
   { key: 'yes-keeping', label: 'Yes, keeping it' },
   { key: 'yes-selling', label: 'Yes, looking to sell or trade' },
 ] as const;
-
-export const sizeBandFor = (lengthFt?: number) =>
-  lengthFt ? SIZE_BANDS.find((b) => lengthFt >= b.min && lengthFt < b.max) : undefined;
-export const budgetBandFor = (priceUsd?: number) =>
-  priceUsd ? BUDGET_BANDS.find((b) => priceUsd >= b.min && priceUsd < b.max) : undefined;
 
 export const WHY_FYI = [
   {

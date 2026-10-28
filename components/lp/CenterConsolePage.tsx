@@ -6,16 +6,18 @@
 // the route noindex; vercel.json adds X-Robots-Tag). The ad's UTMs are stored
 // at startup by utils/attribution and ride along with the lead.
 //
-// This route component is the header + hero, which the app hydrates from the
-// prerendered HTML (index.tsx), so the first paint is never replaced. Everything
-// below the hero is its own chunk (CenterConsoleLanding), fetched on mount.
+// This route component is the header + hero (with the quick contact form),
+// which the app hydrates from the prerendered HTML (index.tsx), so the first
+// paint is never replaced. Everything below the hero is its own chunk
+// (CenterConsoleLanding), fetched on mount.
 
 import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { track } from '../../utils/analytics';
 import { usePageMeta } from '../../utils/usePageMeta';
-import { CC_HERO, LP_CONTEXT, LP_DESCRIPTION, LP_PATH, LP_TITLE } from './ccContent';
+import { CC_HERO, LP_CONTEXT, LP_DESCRIPTION, LP_PATH, LP_TITLE, QUICK_FORM } from './ccContent';
 import { LpFooter, LpShell, readLpCount, scrollToId } from './LpChrome';
-import { trackPhoneClick } from './submitLead';
+import QuickForm from './QuickForm';
+import { submitCcLead, trackPhoneClick } from './submitLead';
 import type { BodyProps } from './CenterConsoleLanding';
 
 const loadBody = () => import('./CenterConsoleLanding');
@@ -66,11 +68,18 @@ export default function CenterConsolePage() {
       hero={{
         ...CC_HERO,
         count,
-        onCta: (e) => {
-          e.preventDefault();
-          track('lp_cta_click', { context: LP_CONTEXT, placement: 'hero' });
-          go('get-matched', 'lp-form-title');
-        },
+        form: (
+          <QuickForm
+            {...QUICK_FORM}
+            placement="hero"
+            onSubmit={(c, guard) => submitCcLead({ kind: 'quick', ...c }, guard)}
+            onPhoneClick={trackPhoneClick}
+            onMore={() => {
+              track('lp_more_click', { context: LP_CONTEXT });
+              go('get-matched', 'lp-form-title');
+            }}
+          />
+        ),
         onBrowse: (e) => { e.preventDefault(); go('inventory'); },
       }}
       onPhoneClick={trackPhoneClick}

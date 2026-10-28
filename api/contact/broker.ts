@@ -20,8 +20,8 @@ const esc = (v: unknown) =>
     .replace(/'/g, '&#39;');
 
 // Lead sources a page may claim for itself; anything else is "Website". The
-// ChatGPT Ads landing page (/lp/center-consoles) sends its leads here when its
-// own HubSpot form isn't configured or fails, and tags them so they still count.
+// ChatGPT Ads landing page (/lp/center-consoles) tags its leads so they can be
+// counted. Each value must be an option of HubSpot's lead_source dropdown.
 const PAGE_LEAD_SOURCES = new Set(['ChatGPT Ads']);
 
 export default async function handler(req: any, res: any) {
