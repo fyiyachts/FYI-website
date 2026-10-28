@@ -11,6 +11,11 @@ import { useJsonLd } from '../../utils/useJsonLd';
 import { Breadcrumbs } from '../public/Breadcrumbs';
 import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track } from '../../utils/analytics';
+import { optImg, srcSet } from '../../utils/img';
+
+/** Hero photo widths and layout size; api/listing.ts preloads the same pair. */
+const HERO_WIDTHS = [640, 960, 1280, 1600];
+const HERO_SIZES = '(min-width: 1280px) 1216px, calc(100vw - 48px)';
 
 // Public, no-login yacht detail page (route: /listing/:id), styled after the
 // listing template on fyiyachts.com (2026-07-22 client request): breadcrumb, big
@@ -22,6 +27,8 @@ import { track } from '../../utils/analytics';
 // stay; the serif accents mirror the template's headings.
 
 interface Boat {
+  /** 'cobrokerage' for BoatsGroup PLS listings; FYI's own boats leave it unset. */
+  listingType?: string;
   id: string;
   title: string;
   boatName?: string;
@@ -51,9 +58,10 @@ interface Boat {
   waterCap?: string;
   holdingCap?: string;
   location?: string;
-  rep?: string;
   images: string[];
   description?: string;
+  /** PLS courtesy line for co-brokerage boats ("…centrally listed by Yachts360."). */
+  courtesy?: string;
 }
 
 const num = (v: unknown): number | undefined => {
@@ -89,6 +97,7 @@ function normalize(it: any): Boat {
   const title = it.BoatName || [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ').trim() || 'Yacht';
   return {
     id: String(it.DocumentID || ''),
+    listingType: it.ListingType || undefined,
     title,
     boatName: it.BoatName || undefined,
     price: it.PriceHideInd ? undefined : num(it.NormPrice ?? it.Price),
@@ -118,9 +127,9 @@ function normalize(it: any): Boat {
     holdingCap: cap(it.HoldingTankCapacityMeasure),
     location: [loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : null, loc.BoatStateCode || loc.BoatCountryID]
       .filter(Boolean).join(', ') || undefined,
-    rep: (it.SalesRep && it.SalesRep.Name) ? String(it.SalesRep.Name).trim() : undefined,
     images: images.slice(0, 30),
     description: typeof it.GeneralBoatDescription === 'string' ? stripHtml(it.GeneralBoatDescription) : undefined,
+    courtesy: typeof it.PlsDisclaimer === 'string' ? stripHtml(it.PlsDisclaimer) || undefined : undefined,
   };
 }
 
@@ -147,9 +156,11 @@ function EnquireModal({ boat, onClose }: { boat: Boat; onClose: () => void }) {
         </button>
         <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-yacht-teal">Private Inquiry</p>
         <h3 className="mt-2 font-serif text-2xl italic text-yacht-900">{boat.title}</h3>
-        {boat.rep && (
+        {/* FYI Exclusives are listed by the brokerage, never a named broker
+            (client, 2026-10-27). Co-brokerage boats show no line at all. */}
+        {boat.listingType !== 'cobrokerage' && (
           <p className="mt-2 text-[13px] font-light text-yacht-900/60">
-            Listed by <span className="font-semibold text-yacht-900">{boat.rep}</span>
+            Listed by <span className="font-semibold text-yacht-900">FYI Yachts</span>
           </p>
         )}
         <div className="mt-5">
@@ -188,6 +199,22 @@ export default function PublicListingPage() {
       .catch(() => { if (alive) setState('error'); });
     return () => { alive = false; };
   }, [id]);
+
+  // Co-brokerage boats: usable but not indexed (api/listing.ts sends the same
+  // meta + X-Robots-Tag). Set for them, removed for every other boat — the SPA
+  // can move between listings without a reload, so a stale tag must not stay.
+  useEffect(() => {
+    const existing = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    if (boat?.listingType === 'cobrokerage') {
+      const tag = existing ?? document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'robots' }));
+      tag.content = 'noindex, follow';
+    } else if (boat && existing) {
+      existing.remove();
+    }
+    return () => {
+      document.head.querySelector('meta[name="robots"][content="noindex, follow"]')?.remove();
+    };
+  }, [boat]);
 
   // Product markup only for priced listings with a photo: without an offer
   // (or the reviews listings never have) Google flags the Product as an
@@ -274,8 +301,17 @@ export default function PublicListingPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="relative overflow-hidden bg-yacht-900/5">
             <button type="button" onClick={() => setLightbox(0)} aria-label={`View ${gallery.length} photos`} className="block w-full cursor-zoom-in">
+              {/* The page's largest paint: fetched first, at the width it is shown.
+                  api/listing.ts preloads this same src/srcset — keep the two in
+                  step (HERO_WIDTHS / HERO_SIZES). */}
               <img
-                src={gallery[0]}
+                src={optImg(gallery[0], 1280)}
+                srcSet={srcSet(gallery[0], HERO_WIDTHS)}
+                sizes={HERO_SIZES}
+                width={1280}
+                height={960}
+                loading="eager"
+                fetchPriority="high"
                 alt={`${boat.title} — main photo`}
                 className="max-h-[70vh] min-h-[320px] w-full object-cover lg:aspect-[16/8]"
               />
@@ -293,7 +329,7 @@ export default function PublicListingPage() {
               {gallery.slice(1, 7).map((src, idx) => (
                 <button key={src + idx} type="button" onClick={() => setLightbox(idx + 1)} aria-label={`Photo ${idx + 2}`}
                   className="group relative overflow-hidden">
-                  <img src={src} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={optImg(src, 320)} alt="" width={320} height={240} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   {idx === 5 && gallery.length > 7 && (
                     <span className="absolute inset-0 flex items-center justify-center bg-yacht-900/60 text-[13px] font-semibold tracking-widest text-white">
                       +{gallery.length - 7}
@@ -400,6 +436,11 @@ export default function PublicListingPage() {
         {/* Right: identity sidebar */}
         <aside id="inquire" className="scroll-mt-24 lg:sticky lg:top-24 lg:self-start">
           <div className="border border-yacht-900/10 bg-white p-7">
+            {boat.listingType !== 'cobrokerage' && (
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-yacht-brand">
+                FYI Exclusive
+              </p>
+            )}
             <h1 className="font-serif text-3xl italic leading-snug text-yacht-900">{displayModel}</h1>
             <p className="mt-2 text-[13px] font-light tracking-wide text-yacht-900/55">
               {[boat.make ? boat.make.toUpperCase() : null, metric].filter(Boolean).join(' · ')}
@@ -408,6 +449,10 @@ export default function PublicListingPage() {
             <p className="mt-5 border-t border-yacht-900/10 pt-5 text-[14px] font-light text-yacht-900/60">
               Asking Price: <span className="text-xl font-semibold tracking-wide text-yacht-900">{usd(boat.price)}</span>
             </p>
+            {/* PLS courtesy line ("…centrally listed by …"): its own line by the price so it is seen at first glance. */}
+            {boat.listingType === 'cobrokerage' && boat.courtesy && (
+              <p className="mt-3 text-[12px] font-light leading-5 text-yacht-900/60">{boat.courtesy}</p>
+            )}
 
             <button
               type="button"
@@ -426,9 +471,10 @@ export default function PublicListingPage() {
             <ContactButtons context={boat.title} />
             {/* A gold "Create Yacht Profile" pairs with the wishlist here. */}
             <CreateYachtProfileCta id={String(boat.id)} name={boat.title} />
-            {boat.rep && (
+            {/* FYI Exclusives: the brokerage, never a named broker (client, 2026-10-27). */}
+            {boat.listingType !== 'cobrokerage' && (
               <p className="mt-5 border-t border-yacht-900/10 pt-4 text-[13px] font-light text-yacht-900/60">
-                Listed by <span className="font-semibold text-yacht-900">{boat.rep}</span>
+                Listed by <span className="font-semibold text-yacht-900">FYI Yachts</span>
               </p>
             )}
           </div>

@@ -7,6 +7,8 @@ import CompareButton from '../compare/CompareButton';
 import { MapPin, Ruler, Calendar, Bell, BellRing, Clock } from 'lucide-react';
 import { hasPriceAlert, setPriceAlert, removePriceAlert } from '../../services/storageService';
 import { daysListed } from '../../utils/formatters';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
 
 interface Props {
   boat: PineconeBoat;
@@ -15,7 +17,8 @@ interface Props {
 
 export default function YachtCard({ boat, showDaysListed }: Props) {
   const imageUrl = boat.images?.[0] || '';
-  const title = boat.boatName || [boat.year, boat.make, boat.model].filter(Boolean).join(' ') || 'Unknown Vessel';
+  const title = yachtTitle(boat.year, boat.make, boat.model) || boat.boatName || 'Unknown Vessel';
+  const nameLine = boatNameLine(boat.boatName, title);
   const location = [boat.location?.city, boat.location?.state].filter(Boolean).join(', ');
   const boatId = String(boat.documentId);
 
@@ -45,7 +48,7 @@ export default function YachtCard({ boat, showDaysListed }: Props) {
     <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-white/20 transition-all group relative">
       <Link to={`/app/yacht/${boat.documentId}`} state={{ boat }} className="block relative aspect-[4/3] overflow-hidden">
         {imageUrl ? (
-          <img src={imageUrl} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+          <img src={optImg(imageUrl, 480)} alt={title} width={480} height={360} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
         ) : (
           <div className="w-full h-full bg-white/5 flex items-center justify-center">
             <span className="text-white/20 text-sm">No Image</span>
@@ -82,7 +85,8 @@ export default function YachtCard({ boat, showDaysListed }: Props) {
       </Link>
 
       <Link to={`/app/yacht/${boat.documentId}`} state={{ boat }} className="block p-3">
-        <h3 className="text-white font-medium text-sm line-clamp-1 mb-1">{title}</h3>
+        <h3 className={`text-white font-medium text-sm line-clamp-1 ${nameLine ? '' : 'mb-1'}`}>{title}</h3>
+        {nameLine && <p className="mb-1 truncate text-xs font-light italic text-white/50">{nameLine}</p>}
         <p className="text-yacht-cream font-bold text-lg">
           {boat.price ? formatPrice(boat.price) : 'Price on Request'}
         </p>

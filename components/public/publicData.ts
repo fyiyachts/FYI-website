@@ -1,3 +1,5 @@
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+
 /**
  * Data layer for the public SEO pages that mirror fyiyachts.com's URL
  * structure (see the page-sitemap there). Slugs are kept IDENTICAL to the
@@ -9,11 +11,14 @@
  * Where a listing came from. Inventory is presented in this order everywhere:
  * FYI's own boats first, then the wider BoatsGroup marketplace.
  */
-export type BoatSource = 'fyi' | 'boatsgroup';
+export type BoatSource = 'fyi' | 'cobrokerage' | 'boatsgroup';
 
 export interface PublicBoat {
   id: string;
+  /** Card title: "{Year} {Make} {Model}" (see utils/boatTitle). */
   title: string;
+  /** The boat's given name ("On the DL"), shown as a secondary line on cards. */
+  boatName?: string;
   make: string;
   model: string;
   year?: number;
@@ -34,6 +39,8 @@ export interface PublicBoat {
   externalUrl?: string;
   /** SoldDate from the feed (ISO) — orders the sold galleries by closing date. */
   soldDate?: string;
+  /** ItemReceivedDate (ISO) — when the boat was first listed; "newest" sorts on it. */
+  listedAt?: string;
 }
 
 /**
@@ -118,7 +125,8 @@ export function normalizePublicBoat(it: Record<string, any>): PublicBoat | null 
   const loc = it.BoatLocation || {};
   return {
     id,
-    title: it.BoatName || [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ').trim() || 'Yacht',
+    title: yachtTitle(it.ModelYear, it.MakeString, it.Model) || String(it.BoatName || '').trim() || 'Yacht',
+    boatName: boatNameLine(it.BoatName, yachtTitle(it.ModelYear, it.MakeString, it.Model)),
     make: it.MakeString || '',
     model: it.Model || '',
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
@@ -136,31 +144,54 @@ export function normalizePublicBoat(it: Record<string, any>): PublicBoat | null 
     image: images[0] ? resizeBG(images[0], 900, 675) : undefined,
     company: it.CompanyName || undefined,
     rep: (it.SalesRep && it.SalesRep.Name) ? String(it.SalesRep.Name).trim() : undefined,
-    source: isFyiCompany(it.CompanyName) ? 'fyi' : 'boatsgroup',
+    source: it.ListingType === 'cobrokerage' ? 'cobrokerage' : isFyiCompany(it.CompanyName) ? 'fyi' : 'boatsgroup',
     soldDate: it.SoldDate ? String(it.SoldDate) : undefined,
+    listedAt: it.ItemReceivedDate ? String(it.ItemReceivedDate) : undefined,
   };
 }
 
 /**
- * Wider BoatsGroup marketplace, excluding FYI's own boats. The key behind
- * `/api/yachts/proxy` is currently scoped to FYI's own book, so this returns
- * nothing today; a broader entitlement on `BOATS_API_KEY` lights it up with no
- * change here.
+ * Co-brokerage listings (BoatsGroup PLS, via /api/yachts/cobrokerage): boats
+ * listed by other brokerages that FYI can sell. PLS does the searching,
+ * sorting and paging; `params` are the same keys as the /yachts-for-sale URL
+ * (q, make, type, minLen, maxLen, minPrice, maxPrice, year, condition, sort)
+ * plus state/country for the location pages. FYI's own boats are dropped
+ * server-side, so they only ever show as FYI Exclusives.
  */
-export async function fetchWorldwideBoatsGroup(make?: string): Promise<PublicBoat[]> {
-  const qs = new URLSearchParams({ rows: '200' });
-  if (make) qs.set('make', make);
-  try {
-    const res = await fetch(`/api/yachts/proxy?${qs.toString()}`, { credentials: 'same-origin' });
-    if (!res.ok) return [];
-    const data = await res.json().catch(() => ({}));
-    const items: any[] = Array.isArray(data?.results) ? data.results : [];
-    return items
+export interface CobrokeragePage {
+  boats: PublicBoat[];
+  /** Matches across all pages, less FYI's own boats found on this page. */
+  numResults: number;
+  /** FYI's own boats removed from this page. */
+  dropped: number;
+  /** PLS offset for the next page, and whether there is one. */
+  nextStart: number;
+  hasMore: boolean;
+}
+
+export async function searchCobrokerage(
+  params: Record<string, string | undefined>,
+  start = 0,
+  rows = 24,
+  signal?: AbortSignal,
+): Promise<CobrokeragePage> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
+  qs.set('start', String(start));
+  qs.set('rows', String(rows));
+  const res = await fetch(`/api/yachts/cobrokerage?${qs.toString()}`, { credentials: 'same-origin', signal });
+  if (!res.ok) throw new Error(`cobrokerage ${res.status}`);
+  const data = await res.json();
+  const items: any[] = Array.isArray(data?.results) ? data.results : [];
+  return {
+    boats: items
       .map(normalizePublicBoat)
-      .filter((b): b is PublicBoat => b !== null && !isFyiCompany(b.company));
-  } catch {
-    return [];
-  }
+      .filter((b): b is PublicBoat => b !== null && !isFyiCompany(b.company)),
+    numResults: Number(data?.numResults) || 0,
+    dropped: Number(data?.dropped) || 0,
+    nextStart: Number(data?.nextStart) || start + rows,
+    hasMore: !!data?.hasMore,
+  };
 }
 
 let inventoryCache: { boats: PublicBoat[]; at: number } | null = null;
@@ -217,6 +248,15 @@ export interface BrandPage {
   seoTitle?: string;
   seoDescription?: string;
 }
+
+/**
+ * The builder as the feeds name it, for make filters: "Ferretti" (feeds say
+ * "Ferretti Yachts"), "Cigarette" (the page says "Cigarette Racing"). Built
+ * from `match` rather than `name`, which is display copy and can carry words
+ * the feed's MakeString doesn't — PLS then matches nothing.
+ */
+export const brandMake = (b: BrandPage): string =>
+  b.match.replace(/\b[a-z]/g, c => c.toUpperCase());
 
 /** Search-result title for a brand page — the per-brand override, else the generic pattern. */
 export const brandSeoTitle = (b: BrandPage): string =>
@@ -337,6 +377,12 @@ export interface CategoryPage {
   description: string; // meta description
   intro: string;
   filter: (b: PublicBoat) => boolean;
+  /**
+   * The same scope for the co-brokerage search, in /api/yachts/cobrokerage
+   * params (minLen, maxLen, type, condition, state, country). Empty = the whole
+   * market. Kept next to `filter` so the two tiers of a page can't drift apart.
+   */
+  cobrokerage: Record<string, string>;
 }
 
 const hasClass = (b: PublicBoat, ...terms: string[]) =>
@@ -350,6 +396,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Browse yachts for sale with FYI Yachts — motor yachts, superyachts, sportfish and more, from our Miami brokerage with a worldwide inventory.',
     intro: 'Every yacht currently listed with FYI Yachts, updated live — and if what you want is not here, our brokers can source and represent any vessel on the market, backed by 300+ years of combined brokerage experience in Miami.',
     filter: () => true,
+    cobrokerage: {},
   },
   {
     slug: 'featured-listings',
@@ -358,6 +405,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Featured yacht listings from FYI Yachts — our exclusive inventory, updated live, with full galleries, specs, and direct broker access.',
     intro: 'The vessels our brokers are proudest to represent right now — every one exclusive to FYI, updated live from the worldwide feed.',
     filter: () => true,
+    cobrokerage: {},
   },
   {
     slug: 'super-yachts-for-sale',
@@ -366,6 +414,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Superyachts for sale from 80 feet and beyond — Azimut Grande, Astondoa, Baglietto and more, brokered by FYI Yachts in Miami.',
     intro: 'From 80 feet to tri-deck flagships: the superyachts currently represented by FYI, each with full specifications, galleries, and direct broker access.',
     filter: b => (b.lengthFt ?? 0) >= 80,
+    cobrokerage: { minLen: '80' },
   },
   {
     // Band widened 60-80 -> 60-90 (2026-08-21). The 80-89ft boats used to land
@@ -379,6 +428,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Browse 60 to 90 foot yachts for sale — flybridge, sportfish, and motor yachts in Miami and South Florida plus worldwide listings, brokered by FYI Yachts.',
     intro: 'The sweet spot of big-boat ownership: real staterooms, serious range, and a size many owners still run themselves. These are the 60-to-90-footers FYI represents right now — most lying in South Florida for easy viewing. Stepping up from a 45–60 footer? We broker both sides of the move.',
     filter: b => (b.lengthFt ?? 0) >= 60 && (b.lengthFt as number) < 90,
+    cobrokerage: { minLen: '60', maxLen: '89' },
   },
   {
     slug: 'yachts-for-sale-miami',
@@ -387,6 +437,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Yachts for sale in Miami and across Florida — locally lying inventory from FYI Yachts, the Miami brokerage on Coral Way since 1994.',
     intro: 'Every vessel here lies in Florida — most within an hour of our Coral Way office — so a showing is a phone call away, not a flight. FYI has brokered Miami’s waterfront since 1994: Coconut Grove, Coral Gables, Miami Beach, Key Biscayne, and up the coast to Fort Lauderdale.',
     filter: b => b.state === 'FL',
+    cobrokerage: { state: 'FL' },
   },
   /**
    * Country pages. FYI's book is not all Florida — 22% of it lies abroad, and
@@ -407,6 +458,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Yachts and sportfish boats for sale lying in Venezuela — La Guaira, Morrocoy, Higuerote and Lecherías — brokered by FYI Yachts of Miami.',
     intro: 'FYI represents more vessels in Venezuela than anywhere outside the United States — Vikings, Bertrams, Sea Rays and Sunseekers lying at La Guaira, Morrocoy, Higuerote and Lecherías. Our consultants work in Spanish, handle export and US import, and can coordinate a delivery or a shipped transport to Florida.',
     filter: b => isCountry(b, 'VE'),
+    cobrokerage: { country: 'VE' },
   },
   {
     slug: 'yachts-for-sale-mexico',
@@ -415,6 +467,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Yachts for sale lying in Mexico — La Paz, Puerto Vallarta, Cozumel and Cancún — including Ferretti, Azimut and Pershing, brokered by FYI Yachts.',
     intro: 'From Cozumel to the Sea of Cortez: the vessels FYI represents in Mexican waters, weighted toward the 70-to-100-foot range. Consultants work in Spanish, know the yards and marinas on both coasts, and handle export paperwork and US import when a buyer wants the boat brought north.',
     filter: b => isCountry(b, 'MX'),
+    cobrokerage: { country: 'MX' },
   },
   {
     slug: 'yachts-for-sale-puerto-rico',
@@ -423,6 +476,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Yachts for sale in Puerto Rico — San Juan, Fajardo and Palmas del Mar — plus the worldwide brokerage market, through FYI Yachts of Miami.',
     intro: 'Puerto Rico is US soil, which makes it the simplest island buy an American owner can make: no import duty, no flag change, and a short run to the Virgins. Here is what is on the market there now, drawn from our own book and the worldwide brokerage feed.',
     filter: b => isCountry(b, 'PR'),
+    cobrokerage: { country: 'PR' },
   },
   {
     slug: 'new-yachts-for-sale',
@@ -431,6 +485,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'New yachts for sale — current-year builds and factory-fresh deliveries from FYI Yachts’ shipyard partners.',
     intro: 'Factory-new vessels from our direct shipyard relationships — including new construction slots and immediate-delivery builds.',
     filter: b => (b.condition || '').toLowerCase() === 'new',
+    cobrokerage: { condition: 'new' },
   },
   {
     slug: 'used-yachts-for-sale',
@@ -439,6 +494,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Used and pre-owned yachts for sale, sea-trialed and broker-verified by FYI Yachts in Miami — plus worldwide brokerage listings sourced through our network.',
     intro: 'Pre-owned doesn’t mean compromise. Every brokerage listing here is represented by an FYI specialist who can arrange surveys, sea trials, and financing.',
     filter: b => (b.condition || '').toLowerCase() === 'used',
+    cobrokerage: { condition: 'used' },
   },
   {
     slug: 'small-yachts-for-sale',
@@ -456,6 +512,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Small yachts and mini yachts for sale under 45 feet with current prices and full photo galleries — dayboats, express cruisers and center consoles, brokered from Miami by FYI Yachts.',
     intro: 'Under 45 feet and easy to own: dayboats, express cruisers, and center consoles that get you on Biscayne Bay this weekend.',
     filter: b => (b.lengthFt ?? 0) > 0 && (b.lengthFt as number) < 45,
+    cobrokerage: { maxLen: '44' },
   },
   {
     slug: 'sport-fishing-yachts-for-sale',
@@ -467,6 +524,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Sport fishers, sportfishing yachts and convertibles for sale — Hatteras, Viking, Bertram, Garlington and more, with live inventory from FYI Yachts in Miami.',
     intro: 'Battlewagons and convertibles ready for the canyons — brokered by specialists who fish.',
     filter: b => hasClass(b, 'fishing', 'convertible'),
+    cobrokerage: { type: 'Sports Fishing Boats' },
   },
   {
     slug: 'center-console-boats-for-sale',
@@ -475,6 +533,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Center console boats for sale — Intrepid, Contender, Boston Whaler and more, from FYI Yachts.',
     intro: 'Run fast, fish hard, rinse off, repeat. The center consoles currently in our exclusive inventory.',
     filter: b => hasClass(b, 'center console'),
+    cobrokerage: { type: 'Center Consoles' },
   },
   {
     slug: 'catamaran-yachts-for-sale',
@@ -483,6 +542,7 @@ export const CATEGORY_PAGES: CategoryPage[] = [
     description: 'Power catamarans and multihull yachts for sale from FYI Yachts in Miami.',
     intro: 'Twice the beam, twice the living space. Multihulls currently represented by FYI.',
     filter: b => hasClass(b, 'catamaran', 'multi-hull', 'multihull') || b.make.toLowerCase().includes('catamaran'),
+    cobrokerage: { type: 'Power Catamarans' },
   },
 ];
 

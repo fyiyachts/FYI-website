@@ -6,6 +6,8 @@ import { submitBriannaLead } from '../chat/briannaClient';
 import { sendVerificationCode, verifyCode } from '../../services/authService';
 import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track, trackAdsConversion } from '../../utils/analytics';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
 
 // "Find Your Yacht Match" — a thumbs-up/down quiz over live inventory.
 // Rate ~10 boats, we score the rest of the fleet against what you liked and
@@ -23,7 +25,10 @@ export const OPEN_QUIZ_EVENT = 'fyi:open-quiz';
 
 interface QuizBoat {
   id: string;
+  /** Card title: "{Year} {Make} {Model}". */
   name: string;
+  /** The boat's given name, shown as a secondary line. */
+  boatName?: string;
   make?: string;
   year?: number;
   lengthFt?: number;
@@ -52,7 +57,8 @@ function mapBoat(it: any): QuizBoat {
   const loc = it.BoatLocation || {};
   return {
     id: String(it.DocumentID || ''),
-    name: it.BoatName || [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ').trim() || 'Yacht',
+    name: yachtTitle(it.ModelYear, it.MakeString, it.Model) || String(it.BoatName || '').trim() || 'Yacht',
+    boatName: boatNameLine(it.BoatName, yachtTitle(it.ModelYear, it.MakeString, it.Model)),
     make: it.MakeString || undefined,
     year: it.ModelYear ? Number(it.ModelYear) : undefined,
     lengthFt: num(it.LengthOverall ?? it.NominalLength),
@@ -417,15 +423,16 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
             <div key={boat.id} className="motion-safe:animate-fade-in-up">
               <div className="overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm">
                 {boat.image ? (
-                  <img src={boat.image} alt={boat.name} className="h-52 w-full object-cover" />
+                  <img src={optImg(boat.image, 640)} alt={boat.name} fetchPriority="high" className="h-52 w-full object-cover" />
                 ) : (
                   <div className="flex h-52 items-center justify-center bg-yacht-900/5"><Anchor className="h-10 w-10 text-yacht-900/25" /></div>
                 )}
                 <div className="p-3.5">
                   <p className="text-[15px] font-semibold text-yacht-900">{boat.name}</p>
+                  {boat.boatName && <p className="truncate text-[13px] font-light italic text-slate-500">{boat.boatName}</p>}
                   <p className="text-[15px] font-bold" style={{ color: '#9d7413' }}>{usd(boat.priceUsd)}</p>
                   <p className="text-[12px] text-slate-500">
-                    {[boat.year, boat.lengthFt ? `${Math.round(boat.lengthFt)} ft` : null, boat.location].filter(Boolean).join(' · ')}
+                    {[boat.lengthFt ? `${Math.round(boat.lengthFt)} ft` : null, boat.location].filter(Boolean).join(' · ')}
                   </p>
                 </div>
               </div>
@@ -503,9 +510,10 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
                 <div className="mt-3 grid grid-cols-2 gap-2.5">
                   {matches.map((b) => (
                     <Link key={b.id} to={`/yacht/${b.id}`} onClick={close} className="group overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm transition hover:border-yacht-teal">
-                      {b.image && <img src={b.image} alt={b.name} className="h-20 w-full object-cover" />}
+                      {b.image && <img src={optImg(b.image, 320)} alt={b.name} loading="lazy" className="h-20 w-full object-cover" />}
                       <div className="p-2">
                         <p className="truncate text-[11.5px] font-semibold text-yacht-900 group-hover:text-yacht-teal">{b.name}</p>
+                        {b.boatName && <p className="truncate text-[10.5px] font-light italic text-slate-500">{b.boatName}</p>}
                         <p className="text-[11.5px] font-bold" style={{ color: '#9d7413' }}>{usd(b.priceUsd)}</p>
                       </div>
                     </Link>

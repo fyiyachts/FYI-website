@@ -3,6 +3,8 @@ import { ArrowRight, MapPin, MessageCircle, Phone, Sparkles } from 'lucide-react
 import { track } from '../../utils/analytics';
 import { useStickyCtaFlag } from '../public/useStickyCtaFlag';
 import { compareSold, soldWindowStart } from '../public/publicData';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
 
 /* ------------------------------------------------- city-level map */
 
@@ -130,7 +132,8 @@ export function AiOverview({ id }: { id: string }) {
 
 /* ------------------------------------------------ recently sold strip */
 
-let soldStripCache: { id: string; title: string; image: string }[] | null = null;
+interface SoldPick { id: string; title: string; boatName?: string | undefined; image: string }
+let soldStripCache: SoldPick[] | null = null;
 
 /** Length in feet off a raw feed row, for the largest-first ordering. */
 const lenOf = (it: any): number =>
@@ -170,11 +173,12 @@ export function RecentlySoldStrip() {
               .filter(Boolean)[0];
             return img ? {
               id: String(it.DocumentID),
-              title: [it.ModelYear, it.MakeString, it.Model].filter(Boolean).join(' ') || 'Sold yacht',
-              image: img.includes('images.boatsgroup.com/images/') ? `${img.replace('/images/', '/resize/')}?w=560&h=373` : img,
+              title: yachtTitle(it.ModelYear, it.MakeString, it.Model) || it.BoatName || 'Sold yacht',
+              boatName: boatNameLine(it.BoatName, yachtTitle(it.ModelYear, it.MakeString, it.Model)),
+              image: optImg(img, 480),
             } : null;
           })
-          .filter((x): x is { id: string; title: string; image: string } => x !== null)
+          .flatMap((x): SoldPick[] => (x ? [x] : []))
           .slice(0, 3);
         soldStripCache = picks;
         if (alive) setSold(picks);
@@ -194,9 +198,12 @@ export function RecentlySoldStrip() {
       <div className="mt-5 grid grid-cols-3 gap-3">
         {sold.map(b => (
           <div key={b.id} className="relative overflow-hidden bg-white">
-            <img src={b.image} alt={`${b.title} — sold by FYI Yachts`} loading="lazy" className="aspect-[16/10] w-full object-cover saturate-[0.7]" />
+            <img src={b.image} alt={`${b.title} — sold by FYI Yachts`} width={480} height={300} loading="lazy" className="aspect-[16/10] w-full object-cover saturate-[0.7]" />
             <span className="absolute left-3 top-3 bg-yacht-brand px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">Sold</span>
-            <p className="truncate px-3 py-2.5 text-[12px] font-medium tracking-wide text-yacht-900">{b.title}</p>
+            <div className="px-3 py-2.5">
+              <p className="truncate text-[12px] font-medium tracking-wide text-yacht-900">{b.title}</p>
+              {b.boatName && <p className="truncate text-[11px] font-light italic text-yacht-900/55">{b.boatName}</p>}
+            </div>
           </div>
         ))}
       </div>
@@ -209,7 +216,7 @@ export function RecentlySoldStrip() {
 // Similar active vessels — cheapest cross-sell on the site. Matches on
 // type/length band, excludes the current listing, from the live feed.
 export function MoreLikeThis({ id, make, lengthFt }: { id: string; make?: string; lengthFt?: number }) {
-  const [picks, setPicks] = useState<{ id: string; title: string; image: string; price: string }[]>([]);
+  const [picks, setPicks] = useState<{ id: string; title: string; boatName?: string; image: string; price: string }[]>([]);
   useEffect(() => {
     let alive = true;
     fetch('/api/yachts/proxy?salesstatus=active&rows=400')
@@ -235,8 +242,9 @@ export function MoreLikeThis({ id, make, lengthFt }: { id: string; make?: string
           .slice(0, 3)
           .map(x => ({
             id: String(x.it.DocumentID),
-            title: [x.it.ModelYear, x.it.MakeString, x.it.Model].filter(Boolean).join(' ') || 'Yacht',
-            image: x.img.includes('images.boatsgroup.com/images/') ? `${x.img.replace('/images/', '/resize/')}?w=560&h=373` : x.img,
+            title: yachtTitle(x.it.ModelYear, x.it.MakeString, x.it.Model) || x.it.BoatName || 'Yacht',
+            boatName: boatNameLine(x.it.BoatName, yachtTitle(x.it.ModelYear, x.it.MakeString, x.it.Model)),
+            image: optImg(x.img, 640),
             price: x.price && x.price > 0 ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(x.price) : 'Price on request',
           }));
         if (alive) setPicks(scored);
@@ -251,9 +259,10 @@ export function MoreLikeThis({ id, make, lengthFt }: { id: string; make?: string
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {picks.map(b => (
           <a key={b.id} href={`/listing/${b.id}`} className="group block overflow-hidden bg-white shadow-sm transition-shadow hover:shadow-md">
-            <img src={b.image} alt={b.title} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={b.image} alt={b.title} width={640} height={480} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
             <div className="p-4">
               <h3 className="truncate text-[14px] font-medium tracking-wide text-yacht-900">{b.title}</h3>
+              {b.boatName && <p className="truncate text-[12px] font-light italic text-yacht-900/55">{b.boatName}</p>}
               <p className="mt-1 text-[13px] font-semibold text-yacht-900/80">{b.price}</p>
             </div>
           </a>

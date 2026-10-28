@@ -206,6 +206,10 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/llms-inventory.txt",
+      "destination": "/api/llms-inventory"
+    },
+    {
       "source": "/sitemap-listings.xml",
       "destination": "/api/sitemap-listings"
     },

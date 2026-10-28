@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Anchor, ArrowLeft, Languages, Mail, Phone } from 'lucide-react';
-import { memberBySlug } from './fyiTeam';
+import { memberBySlug, telHref } from './fyiTeam';
 import { BrokerAvatar } from './TeamPage';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
 
 const GOLD = '#D4AF37';
 
@@ -10,6 +12,7 @@ interface BrokerBoat {
   id: string;
   name: string;
   make?: string;
+  model?: string;
   year?: number;
   lengthFt?: number;
   priceUsd?: number;
@@ -26,8 +29,11 @@ const usd = (n?: number) =>
     : 'Price on request';
 
 function BoatCard({ boat, sold }: { boat: BrokerBoat; sold?: boolean }) {
+  // `name` from the feed is the boat's given name, or year/make/model when it
+  // has none — so it is the secondary line only when it says something new.
+  const title = yachtTitle(boat.year, boat.make, boat.model) || boat.name;
+  const boatName = boatNameLine(boat.name, title);
   const meta = [
-    boat.year ? String(boat.year) : null,
     boat.lengthFt ? `${Math.round(boat.lengthFt)} ft` : null,
     [boat.city, boat.state || boat.country].filter(Boolean).join(', ') || null,
   ].filter(Boolean).join(' · ');
@@ -36,7 +42,7 @@ function BoatCard({ boat, sold }: { boat: BrokerBoat; sold?: boolean }) {
     <div className="overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm transition group-hover:border-yacht-teal group-hover:shadow-md">
       <div className="relative h-36 w-full bg-yacht-900/5">
         {boat.image ? (
-          <img src={boat.image} alt={boat.name} loading="lazy" className={`h-full w-full object-cover ${sold ? 'saturate-[0.6]' : ''}`} />
+          <img src={optImg(boat.image, 480)} alt={title} loading="lazy" className={`h-full w-full object-cover ${sold ? 'saturate-[0.6]' : ''}`} />
         ) : (
           <div className="flex h-full items-center justify-center"><Anchor className="h-8 w-8 text-yacht-900/25" /></div>
         )}
@@ -47,7 +53,8 @@ function BoatCard({ boat, sold }: { boat: BrokerBoat; sold?: boolean }) {
         )}
       </div>
       <div className="p-3">
-        <p className="truncate text-[13px] font-semibold text-yacht-900">{boat.name}</p>
+        <p className="truncate text-[13px] font-semibold text-yacht-900">{title}</p>
+        {boatName && <p className="truncate text-[12px] font-light italic text-slate-500">{boatName}</p>}
         <p className="text-[13px] font-bold" style={{ color: sold ? '#64748b' : '#9d7413' }}>
           {sold ? (boat.priceUsd != null ? `Listed at ${usd(boat.priceUsd)}` : 'Sold') : usd(boat.priceUsd)}
         </p>
@@ -115,10 +122,10 @@ export default function BrokerPage() {
             </p>
           </div>
           <div className="flex flex-none flex-col gap-2 text-[13px]">
-            <a href="tel:+13058546020" className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
-              <Phone className="h-4 w-4" style={{ color: GOLD }} /> (305) 854-6020
+            <a href={member.phone ? telHref(member.phone) : 'tel:+13058546020'} className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
+              <Phone className="h-4 w-4" style={{ color: GOLD }} /> {member.phone ?? '(305) 854-6020'}
             </a>
-            <a href={`mailto:sales@fyiyachts.com?subject=${encodeURIComponent(`Inquiry for ${member.name}`)}`} className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
+            <a href={`mailto:${member.email ?? 'sales@fyiyachts.com'}?subject=${encodeURIComponent(`Inquiry for ${member.name}`)}`} className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-medium transition hover:bg-white/20">
               <Mail className="h-4 w-4" style={{ color: GOLD }} /> Contact {member.name.split(' ')[0]}
             </a>
           </div>

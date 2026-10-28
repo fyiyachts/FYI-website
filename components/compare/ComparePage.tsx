@@ -5,6 +5,8 @@ import { searchPinecone } from '../../services/pineconeService';
 import type { PineconeBoat } from '../../types/search';
 import { formatPrice } from '../../utils/formatters';
 import { BarChart3, X, Trash2, Loader2 } from 'lucide-react';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
 
 export default function ComparePage() {
   const [ids, setIds] = useState<number[]>([]);
@@ -104,13 +106,18 @@ export default function ComparePage() {
                     </button>
                     <Link to={`/app/yacht/${boat.documentId}`}>
                       {boat.images?.[0] ? (
-                        <img src={boat.images[0]} alt={boat.boatName || 'Yacht'} className="w-full aspect-[4/3] object-cover rounded-lg mb-2" />
+                        <img src={optImg(boat.images[0], 480)} alt={yachtTitle(boat.year, boat.make, boat.model) || boat.boatName || 'Yacht'} className="w-full aspect-[4/3] object-cover rounded-lg mb-2" />
                       ) : (
                         <div className="w-full aspect-[4/3] bg-white/5 rounded-lg mb-2" />
                       )}
                       <p className="text-white text-sm font-medium line-clamp-1">
-                        {boat.boatName || [boat.year, boat.make, boat.model].filter(Boolean).join(' ') || 'Unknown Vessel'}
+                        {yachtTitle(boat.year, boat.make, boat.model) || boat.boatName || 'Unknown Vessel'}
                       </p>
+                      {boatNameLine(boat.boatName, yachtTitle(boat.year, boat.make, boat.model)) && (
+                        <p className="truncate text-xs font-light italic text-white/50">
+                          {boatNameLine(boat.boatName, yachtTitle(boat.year, boat.make, boat.model))}
+                        </p>
+                      )}
                     </Link>
                   </div>
                 </th>

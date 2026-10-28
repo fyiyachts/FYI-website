@@ -12,6 +12,8 @@ import { Sparkles, Loader2, MapPin, Ruler, Calendar, Search, ChevronRight, Heart
 import { getQuizProfile, deriveTaste, quizMatchScore, usdShort } from '../quiz/quizProfile';
 import { OPEN_QUIZ_EVENT } from '../quiz/YachtMatchQuiz';
 import { YACHT_MATCH_ENABLED } from '../../utils/featureFlags';
+import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
+import { optImg } from '../../utils/img';
 
 interface ScoredBoat extends PineconeBoat {
   matchScore: number;
@@ -252,7 +254,8 @@ export default function ForYouPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {recommendations.map(boat => {
-              const title = boat.boatName || [boat.year, boat.make, boat.model].filter(Boolean).join(' ') || 'Unknown Vessel';
+              const title = yachtTitle(boat.year, boat.make, boat.model) || boat.boatName || 'Unknown Vessel';
+              const nameLine = boatNameLine(boat.boatName, title);
               const imageUrl = boat.images?.[0] || '';
               const location = [boat.location?.city, boat.location?.state].filter(Boolean).join(', ');
 
@@ -263,7 +266,7 @@ export default function ForYouPage() {
                 >
                   <Link to={`/app/yacht/${boat.documentId}`} state={{ boat }} className="block relative aspect-[4/3] overflow-hidden">
                     {imageUrl ? (
-                      <img src={imageUrl} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                      <img src={optImg(imageUrl, 480)} alt={title} width={480} height={360} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                     ) : (
                       <div className="w-full h-full bg-white/5 flex items-center justify-center">
                         <span className="text-white/20 text-sm">No Image</span>
@@ -283,7 +286,8 @@ export default function ForYouPage() {
                   </Link>
 
                   <Link to={`/app/yacht/${boat.documentId}`} state={{ boat }} className="block p-3">
-                    <h3 className="text-white font-medium text-sm line-clamp-1 mb-1">{title}</h3>
+                    <h3 className={`text-white font-medium text-sm line-clamp-1 ${nameLine ? '' : 'mb-1'}`}>{title}</h3>
+                    {nameLine && <p className="mb-1 truncate text-xs font-light italic text-white/50">{nameLine}</p>}
                     <p className="text-yacht-cream font-bold text-lg">
                       {boat.price ? formatPrice(boat.price) : 'Price on Request'}
                     </p>
