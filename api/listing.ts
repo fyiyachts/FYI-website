@@ -99,11 +99,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const url = new URL(UPSTREAM);
       url.searchParams.set('key', KEY);
       url.searchParams.set('documentid', id);
-      const feed = (await fetch(url).then((r) => r.json())) as { results?: Record<string, any>[] };
+      // A failed or timed-out lookup is an outage (503 below), never "not
+      // found": a 404 for a live boat tells Google to drop it.
+      const r = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      if (!r.ok) throw new Error(`feed HTTP ${r.status}`);
+      const feed = (await r.json()) as { results?: Record<string, any>[] };
       it = feed.results?.[0];
     }
     // Co-brokerage boats (BoatsGroup PLS) get the same server-rendered page.
-    if (!it) it = await plsGetById(id).catch(() => undefined);
+    // A PLS error throws to the 503 path; only a clean miss is a 404.
+    if (!it) it = await plsGetById(id);
     if (!it) return notFound(res);
 
     // Co-brokerage boats are usable (linked, browsable, shareable) but kept
