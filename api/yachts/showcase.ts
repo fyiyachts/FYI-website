@@ -46,9 +46,14 @@ function card(b: FleetBoat) {
 
 const withinWindow = (soldDate: string | undefined, from: string) => !!soldDate && soldDate.slice(0, 10) >= from;
 
-/** Similar active boats: same make +2, length within 0.6×–1.5× +1. Hand-entered first, as the proxy lists them. */
+/**
+ * Similar active boats: same make +2, length within 0.6×–1.5× +1. Ties go to
+ * the closest length, so no group of boats (e.g. the hand-entered ones, which
+ * come first in the list) wins every tie.
+ */
 function similar(active: FleetBoat[], id: string, make: string, len: number): FleetBoat[] {
   const band = len > 0 ? [len * 0.6, len * 1.5] : null;
+  const gap = (b: FleetBoat) => (len > 0 && b.lengthFt ? Math.abs(b.lengthFt - len) : Infinity);
   return active
     .filter((b) => b.id !== id && b.image)
     .map((b, i) => {
@@ -58,7 +63,7 @@ function similar(active: FleetBoat[], id: string, make: string, len: number): Fl
       return { b, i, score };
     })
     .filter((x) => x.score > 0)
-    .sort((x, y) => y.score - x.score || x.i - y.i)
+    .sort((x, y) => y.score - x.score || gap(x.b) - gap(y.b) || x.i - y.i)
     .slice(0, 3)
     .map((x) => x.b);
 }
