@@ -87,23 +87,22 @@ export function trackPhoneClick(placement: string): void {
   track('phone_click', { context: LP_CONTEXT, placement, page_path: LP_PATH });
 }
 
-const CONVERTED_KEY = 'fyi_lp_cc_converted';
-
 /**
- * True for the visit's first lead. A visitor who sends the quick form and then
- * the step form is one conversion, not two, in GA4 and the ad platforms.
+ * True for the visit's first lead on a page (key: one per landing page). A
+ * visitor who sends the quick form and then the step form is one conversion,
+ * not two, in GA4 and the ad platforms.
  */
-function firstLeadThisVisit(): boolean {
+export function firstLeadThisVisit(key: string): boolean {
   try {
-    if (sessionStorage.getItem(CONVERTED_KEY)) return false;
-    sessionStorage.setItem(CONVERTED_KEY, '1');
+    if (sessionStorage.getItem(key)) return false;
+    sessionStorage.setItem(key, '1');
   } catch { /* storage unavailable: count it */ }
   return true;
 }
 
 /** Every conversion tag, once per visit; follow-up details get their own event. */
 function fireConversions(lead: CcLead): void {
-  if (firstLeadThisVisit()) {
+  if (firstLeadThisVisit('fyi_lp_cc_converted')) {
     track('generate_lead', { context: LP_CONTEXT, page_path: LP_PATH, lead_source: LEAD_SOURCE, form: lead.kind });
     trackAdsConversion(LP_CONTEXT);
     // Meta Lead — fires when a Meta pixel is on the page (none is today).
@@ -115,24 +114,12 @@ function fireConversions(lead: CcLead): void {
   identifyVisitor(lead.email);
 }
 
-/** Submit a lead; ok once it has landed somewhere a broker will see it. */
-export async function submitCcLead(
-  lead: CcLead,
-  guard: { company: string; formOpenedAt: number },
-): Promise<{ ok: boolean; error?: string }> {
-  const l = lead.listing;
-  const body = JSON.stringify({
-    yacht: l
-      ? { title: l.title, price: l.price, year: l.year, make: l.make, model: l.model, length: l.lengthFt ? `${l.lengthFt} ft` : undefined, location: l.location }
-      : { title: LP_CONTEXT },
-    name: lead.name,
-    email: lead.email,
-    phone: lead.phone,
-    message: composeMessage(lead),
-    attribution: getAttribution(),
-    leadSource: LEAD_SOURCE,
-    ...guard,
-  });
+/**
+ * POST a lead to /api/contact/broker; ok once it has landed somewhere a
+ * broker will see it. The landing pages' one way to send a lead.
+ */
+export async function postLead(payload: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
+  const body = JSON.stringify(payload);
   // One automatic retry on a dropped connection or a server error, so a blip
   // never reaches the visitor. Safe to repeat: a lead that did land makes the
   // retry a duplicate, which the endpoint answers without sending again; one
@@ -147,12 +134,31 @@ export async function submitCcLead(
     }
     if (attempt === 1) await new Promise((r) => setTimeout(r, 1500));
   }
-  if (res?.ok) {
-    fireConversions(lead);
-    return { ok: true };
-  }
+  if (res?.ok) return { ok: true };
   // A 4xx says what to fix ("Please enter a valid email address"); a 5xx or a
   // dead connection is no use to a visitor, so they get the generic line.
   const detail = res && res.status < 500 ? await res.json().catch(() => null) : null;
   return { ok: false, error: typeof detail?.error === 'string' ? detail.error : undefined };
+}
+
+/** Submit a lead; ok once it has landed somewhere a broker will see it. */
+export async function submitCcLead(
+  lead: CcLead,
+  guard: { company: string; formOpenedAt: number },
+): Promise<{ ok: boolean; error?: string }> {
+  const l = lead.listing;
+  const res = await postLead({
+    yacht: l
+      ? { title: l.title, price: l.price, year: l.year, make: l.make, model: l.model, length: l.lengthFt ? `${l.lengthFt} ft` : undefined, location: l.location }
+      : { title: LP_CONTEXT },
+    name: lead.name,
+    email: lead.email,
+    phone: lead.phone,
+    message: composeMessage(lead),
+    attribution: getAttribution(),
+    leadSource: LEAD_SOURCE,
+    ...guard,
+  });
+  if (res.ok) fireConversions(lead);
+  return res;
 }
