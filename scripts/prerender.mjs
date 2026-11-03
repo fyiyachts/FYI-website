@@ -192,6 +192,7 @@ for (const r of routes) {
     // description and the facts are never seen by a searcher.
     `<meta name="description" content="${esc(r.description)}" data-static-path="${esc(r.path)}" />`,
     r.noindex ? `<meta name="robots" content="noindex" />` : '',
+    ...(r.preloadImages ?? []).map((src) => `<link rel="preload" as="image" href="${esc(src)}" fetchpriority="high" />`),
     `<link rel="canonical" href="${esc(canonical)}" />`,
     // hreflang. Google reads these from the served HTML; the React tier already
     // declared the same pairs but injected them on mount, so they landed on 0

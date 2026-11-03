@@ -17,6 +17,8 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { LpShell } from '../components/lp/LpChrome';
 import QuickForm from '../components/lp/QuickForm';
+import { C105Shell } from '../components/lp/Charter105Hero';
+import { C105_DESCRIPTION, C105_MEDIA, C105_PATH, C105_TITLE } from '../components/lp/charter105Content';
 import { CC_FAQS, CC_HERO, LP_DESCRIPTION, LP_PATH, LP_TITLE, QUICK_FORM, isCenterConsole } from '../components/lp/ccContent';
 import { plsSearch, PLS_CARD_FIELDS } from '../api/_lib/plsFeed';
 import {
@@ -66,6 +68,10 @@ export interface SeoRoute {
   // landing pages set it so the CDN serves the header and hero React mounts
   // over, rather than a stand-in that gets swapped out (and moves the LCP).
   shellHtml?: string;
+  // Images the first paint needs, preloaded from the <head> so the browser
+  // fetches them with the HTML rather than when it reaches them (a video
+  // poster is otherwise found late and becomes a late largest paint).
+  preloadImages?: string[];
 }
 
 const ORG = {
@@ -225,6 +231,17 @@ export function buildRoutes(newsIndex: { slug: string; title: string; date: stri
     noindex: true,
     jsonLd: [faqSchema(CC_FAQS)],
     shellHtml: landingShell(null),
+  });
+
+  // Meta Ads charter promo (105′ Azimut): noindex, out of the sitemap; its
+  // shell is the page's own header + video hero.
+  routes.push({
+    path: C105_PATH,
+    title: C105_TITLE,
+    description: C105_DESCRIPTION,
+    noindex: true,
+    shellHtml: renderToString(createElement(C105Shell)).replace(/^(?:<link [^>]*>)+/, ''),
+    preloadImages: [C105_MEDIA.poster],
   });
 
   routes.push({

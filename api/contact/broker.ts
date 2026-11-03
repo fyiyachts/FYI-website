@@ -24,6 +24,12 @@ const esc = (v: unknown) =>
 // counted. Each value must be an option of HubSpot's lead_source dropdown.
 const PAGE_LEAD_SOURCES = new Set(['ChatGPT Ads']);
 
+// Page contexts that change only how the lead is labelled, not its source.
+// The charter promo page (/lp/charterspecial) sends "Charter Promo": its email
+// reads "[Charter Promo] Booking request" with charters@ copied, and its
+// HubSpot note is titled to match. Every other form is unaffected.
+const CHARTER_PROMO = 'Charter Promo';
+
 // Room for one email retry and the HubSpot fallback below.
 export const maxDuration = 60;
 
@@ -66,6 +72,7 @@ export default async function handler(req: any, res: any) {
     const body = parseJsonBody(req);
     const { yacht, attribution } = body;
     const leadSource: string = PAGE_LEAD_SOURCES.has(body.leadSource) ? body.leadSource : 'Website';
+    const charterPromo = body.context === CHARTER_PROMO;
     if (!yacht?.title) return fail(res, 'Yacht info is required', 400);
 
     // Bot/spam screen. Runs before any delivery work so junk costs us nothing
@@ -145,8 +152,11 @@ export default async function handler(req: any, res: any) {
       const send = () => withTimeout(getTransporter().sendMail({
         from: `"FYI Yachts Portal" <${getSmtpUser()}>`,
         to: 'sales@fyiyachts.com',
+        ...(charterPromo ? { cc: 'charters@fyiyachts.com' } : {}),
         replyTo: email,
-        subject: `${leadSource === 'Website' ? '' : `[${leadSource}] `}Inquiry: ${yacht.title} — ${yacht.price || 'Price on Request'}`,
+        subject: charterPromo
+          ? `[${CHARTER_PROMO}] Booking request: ${yacht.title} — ${yacht.price || 'Price on Request'}`
+          : `${leadSource === 'Website' ? '' : `[${leadSource}] `}Inquiry: ${yacht.title} — ${yacht.price || 'Price on Request'}`,
         html,
       }), 15_000, 'SMTP send');
       // One retry: Gmail SMTP refuses the odd connection.
@@ -174,7 +184,11 @@ export default async function handler(req: any, res: any) {
             .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
           attribution: attr,
         },
-        { leadSource: source, noteTitle: leadSource === 'Website' ? 'Website yacht inquiry' : `${leadSource} inquiry` },
+        {
+          leadSource: source,
+          noteTitle: charterPromo ? `${CHARTER_PROMO} booking request`
+            : leadSource === 'Website' ? 'Website yacht inquiry' : `${leadSource} inquiry`,
+        },
       ), 20_000, 'HubSpot sync');
       // HubSpot outages are already retried inside syncToFyiHubspot. What it
       // can't fix is a rejected value: lead_source is a dropdown, and a page's

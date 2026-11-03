@@ -24,26 +24,43 @@ export const LP_CTA = `${CTA_BASE} focus-visible:outline-white`;
 /** Primary CTA on white and off-white sections. */
 export const LP_CTA_LIGHT = `${CTA_BASE} focus-visible:outline-yacht-900`;
 
-export function LpHeader({ onPhoneClick }: { onPhoneClick?: PhoneClick }) {
+export function LpHeader({ onPhoneClick, overlay = false }: {
+  onPhoneClick?: PhoneClick;
+  /** Transparent, over a full-bleed hero (the charter page's video). */
+  overlay?: boolean;
+}) {
   return (
-    <header className="bg-yacht-900">
+    <header className={overlay ? 'absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-yacht-900/55 to-transparent' : 'bg-yacht-900'}>
       <div className={`${LP_WRAP} flex h-[72px] items-center justify-between gap-4 sm:h-20`}>
         <a href="/" aria-label="FYI Yachts home" className="shrink-0">
           <FYILogo className="h-10 w-auto sm:h-12" />
         </a>
         {/* A clear call button, number included: some visitors would rather talk. */}
-        <a
-          href={`tel:${LP_PHONE_TEL}`}
-          onClick={onPhoneClick ? () => onPhoneClick('header') : undefined}
-          aria-label={`Call us at ${LP_PHONE_DISPLAY}`}
-          className="inline-flex min-h-[48px] items-center gap-3 border border-white/60 px-4 py-1.5 text-white transition-colors hover:border-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-5"
-        >
-          <Phone className="h-4 w-4 shrink-0 text-yacht-teal" aria-hidden="true" />
-          <span className="flex flex-col leading-tight sm:flex-row sm:items-center sm:gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em]">Call us</span>
-            <span className="text-[13px] font-semibold tracking-[0.06em]">{LP_PHONE_DISPLAY}</span>
-          </span>
-        </a>
+        {overlay ? (
+          <a
+            href={`tel:${LP_PHONE_TEL}`}
+            onClick={onPhoneClick ? () => onPhoneClick('header') : undefined}
+            aria-label={`Call us at ${LP_PHONE_DISPLAY}`}
+            className="inline-flex min-h-[44px] items-center gap-2.5 rounded-full border border-white/55 px-4 py-1.5 text-[13px] font-semibold tracking-[0.04em] text-white transition-colors hover:border-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-white"
+          >
+            <Phone className="h-4 w-4 shrink-0 text-[#6fe0e4]" aria-hidden="true" />
+            <span className="hidden text-[11px] uppercase tracking-[0.2em] sm:inline">Call us</span>
+            <span>{LP_PHONE_DISPLAY}</span>
+          </a>
+        ) : (
+          <a
+            href={`tel:${LP_PHONE_TEL}`}
+            onClick={onPhoneClick ? () => onPhoneClick('header') : undefined}
+            aria-label={`Call us at ${LP_PHONE_DISPLAY}`}
+            className="inline-flex min-h-[48px] items-center gap-3 border border-white/60 px-4 py-1.5 text-white transition-colors hover:border-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-5"
+          >
+            <Phone className="h-4 w-4 shrink-0 text-yacht-teal" aria-hidden="true" />
+            <span className="flex flex-col leading-tight sm:flex-row sm:items-center sm:gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em]">Call us</span>
+              <span className="text-[13px] font-semibold tracking-[0.06em]">{LP_PHONE_DISPLAY}</span>
+            </span>
+          </a>
+        )}
       </div>
     </header>
   );

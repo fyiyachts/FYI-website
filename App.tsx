@@ -8,6 +8,7 @@ import ThankYouPage from './components/public/ThankYouPage';
 // Eager: it is only the header + hero, hydrated from the prerendered HTML.
 // The rest of the page is its own chunk (see the component).
 import CenterConsolePage from './components/lp/CenterConsolePage';
+import Charter105Page from './components/lp/Charter105Page';
 import { CaseStudiesPage, CaseStudyPage } from './components/public/CaseStudies';
 import HomePage from './components/home/HomePage';
 import {
@@ -221,6 +222,7 @@ export default function App() {
         <Route path="/thank-you" element={<ThankYouPage />} />
         {/* Paid-traffic landing pages: noindex, no nav, not in the sitemap. */}
         <Route path="/lp/center-consoles" element={<CenterConsolePage />} />
+        <Route path="/lp/charterspecial" element={<Charter105Page />} />
         {/* Narrative proof: published closings told as deals, sourced from
             FYI's own announcements (components/public/caseStudyData.ts). */}
         <Route path="/case-studies" element={<CaseStudiesPage />} />
