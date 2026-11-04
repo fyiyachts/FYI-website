@@ -48,6 +48,19 @@
   animation: fade-in-up 0.3s ease-out;
 }
 
+/* Charter Special pop-up (components/promo): the "Limited promo" badge's dot. */
+@keyframes cp-pulse {
+  50% { opacity: 0.35; }
+}
+
+.animate-cp-pulse {
+  animation: cp-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cp-pulse { animation: none; }
+}
+
 /* Homepage concept (/homepage): slow hero zoom + brand marquee. */
 @keyframes kenburns {
   from { transform: scale(1); }
