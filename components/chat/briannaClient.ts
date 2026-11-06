@@ -2,6 +2,7 @@
 // visible history and parses the SSE reply into typed callbacks.
 
 import { getAttribution } from '../../utils/attribution';
+import type { MetaLeadContext } from '../../utils/metaPixel';
 import { getPageContext } from '../../utils/pageContext';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 
@@ -77,6 +78,7 @@ export async function submitBriannaLead(payload: {
   brands?: string[];  // builders the visitor liked — tags boat_brands_interested
   budget?: string;    // budget range — tags the budget property
   company?: string;   // honeypot — humans never fill this
+  meta?: MetaLeadContext; // Meta eventID + browser IDs, for the Conversions API later
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch('/api/chat/brianna-lead', {

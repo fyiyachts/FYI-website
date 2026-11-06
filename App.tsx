@@ -11,6 +11,7 @@ import CenterConsolePage from './components/lp/CenterConsolePage';
 import Charter105Page from './components/lp/Charter105Page';
 // Site-wide Charter Special pop-up; switch it off in components/promo/charterPromo.ts.
 import CharterPromoPopup from './components/promo/CharterPromoPopup';
+import MetaPixelRuntime from './components/tracking/MetaPixelRuntime';
 import { CaseStudiesPage, CaseStudyPage } from './components/public/CaseStudies';
 import HomePage from './components/home/HomePage';
 import {
@@ -146,6 +147,7 @@ export default function App() {
     <AuthProvider>
       <ScrollToTop />
       <AttributionRuntime />
+      <MetaPixelRuntime />
       <CharterPromoPopup />
       <Routes>
         {/* The authenticated portal — dashboard, search, saved, admin, etc.

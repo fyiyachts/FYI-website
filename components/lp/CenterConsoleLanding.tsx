@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Anchor, ChevronDown, ExternalLink, MapPin, Search, X } from 'lucide-react';
 import { track } from '../../utils/analytics';
+import { trackMetaSearch } from '../../utils/metaPixel';
 import { optImg, srcSet } from '../../utils/img';
 import { fetchActiveInventory, fmtBoatPrice, searchCobrokerage, type PublicBoat } from '../public/publicData';
 import {
@@ -238,6 +239,10 @@ function Inventory({ all, exState, onRequest, onUnfilteredTotal }: {
   const size = SIZE_BANDS.find((s) => s.key === len);
   const budget = BUDGET_BANDS.find((b) => b.key === price);
   const filtered = !!(q || brand || size || budget || year);
+
+  // Meta Search: the active search / filters, once the visitor stops typing.
+  const metaSearch = [q.trim(), brand.trim(), size?.label, budget?.label, year ? `${year}+` : ''].filter(Boolean).join(', ');
+  useEffect(() => { trackMetaSearch(metaSearch); }, [metaSearch]);
 
   // Filters live in the URL (shareable, survive a reload) next to the ad's
   // utm_* params, which are left untouched. replace: no history entry per keystroke.

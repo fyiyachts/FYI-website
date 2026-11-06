@@ -6,6 +6,7 @@ import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { track, trackAdsConversion } from '../../utils/analytics';
+import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
 
 interface Props {
   yacht: YachtListing;
@@ -27,6 +28,7 @@ export default function ContactBrokerForm({ yacht }: Props) {
     if (!name.trim() || !email.trim() || !message.trim()) { setError('Please fill in all required fields.'); return; }
     setError('');
     setLoading(true);
+    const meta = metaLeadContext();
     try {
       const res = await fetch('/api/contact/broker', {
         method: 'POST',
@@ -35,6 +37,7 @@ export default function ContactBrokerForm({ yacht }: Props) {
         body: JSON.stringify({
           name, email, phone, message,
           attribution: getAttribution(),
+          meta,
           ...guardFields(guard),
           yacht: {
             title: yacht.title,
@@ -59,6 +62,12 @@ export default function ContactBrokerForm({ yacht }: Props) {
       // so the lead + Ads conversion fire here instead of on /thank-you.
       track('generate_lead', { context: 'Listing inquiry', page_path: window.location.pathname });
       trackAdsConversion('Listing inquiry');
+      void trackMetaLead({
+        contentName: `Listing inquiry — ${yacht.title}`,
+        contentIds: yacht.id ? [String(yacht.id)] : undefined,
+        user: { email, phone, fullName: name },
+        eventId: meta.eventId,
+      });
       setSent(true);
     } catch (err: any) {
       setError(err.message || 'Failed to send inquiry.');

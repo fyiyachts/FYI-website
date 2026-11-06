@@ -28,6 +28,7 @@ import { track as trackEvent } from '../../utils/analytics';
 import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
+import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
 import { VOICE_SEARCH_ENABLED, SPANISH_ENABLED } from '../../utils/featureFlags';
 import { languageToggleTarget } from '../es/esRoutes';
 import { FYI_TEAM, repKey } from '../team/fyiTeam';
@@ -2215,6 +2216,7 @@ function ContactBand() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setState('sending');
+    const meta = metaLeadContext();
     try {
       const res = await fetch('/api/contact/broker', {
         method: 'POST',
@@ -2224,6 +2226,7 @@ function ContactBand() {
           email,
           message: message || `${interest} inquiry from the homepage.`,
           attribution: getAttribution(),
+          meta,
           ...guardFields(guard),
           yacht: { title: interest || 'Homepage private inquiry' },
         }),
@@ -2232,6 +2235,7 @@ function ContactBand() {
       trackEvent('inquiry_submit', { context: 'homepage_contact_band' });
       trackEvent('generate_lead', { context: 'homepage_contact_band' });
       identifyVisitor(email);
+      void trackMetaLead({ contentName: `Homepage contact — ${interest || 'private inquiry'}`, user: { email, fullName: name }, eventId: meta.eventId });
       setState('sent');
     } catch {
       setState('error');

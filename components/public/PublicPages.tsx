@@ -9,6 +9,7 @@ import { track } from '../../utils/analytics';
 import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
+import { metaLeadContext, trackMetaLead, trackMetaSearch } from '../../utils/metaPixel';
 import { optImg, srcSet } from '../../utils/img';
 import { fetchJsonShared } from '../../utils/sharedFetch';
 import { FaqSection, CHARTER_FAQS, SELL_FAQS } from './Faq';
@@ -682,6 +683,14 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
 
   const exclusives = useMemo(() => sortBoats(applyFilters(boats, filters), sort), [boats, filters, sort]);
 
+  // Meta Search: the visitor's active search / filters, once they stop typing.
+  const searchString = (Object.keys(filters) as (keyof Filters)[])
+    .filter(k => filters[k])
+    .map(k => (k === 'q' ? filters.q.trim() : chipLabel(k, filters[k])))
+    .filter(Boolean)
+    .join(', ');
+  useEffect(() => { trackMetaSearch(searchString); }, [searchString]);
+
   // Co-brokerage: PLS searches, sorts and pages. Any change to the request
   // starts over at the first page; typing is debounced so each keystroke
   // doesn't become a search.
@@ -872,6 +881,7 @@ export function PublicInquiryForm({ context, dark = false, messagePlaceholder, i
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setState('sending');
+    const meta = metaLeadContext();
     try {
       const res = await fetch('/api/contact/broker', {
         method: 'POST',
@@ -880,6 +890,7 @@ export function PublicInquiryForm({ context, dark = false, messagePlaceholder, i
           name, email, phone: phone || null,
           message: message || `${context} inquiry from the website.`,
           attribution: getAttribution(),
+          meta,
           ...guardFields(guard),
           yacht: { title: context },
         }),
@@ -892,6 +903,8 @@ export function PublicInquiryForm({ context, dark = false, messagePlaceholder, i
       }
       track('inquiry_submit', { context });
       identifyVisitor(email);
+      // FYI Pixel Lead. On /listing/<id> pages it carries the DocumentID.
+      void trackMetaLead({ contentName: context, user: { email, phone, fullName: name }, eventId: meta.eventId });
       if (inlineConfirm) {
         // No navigation, so this form owns the conversion event that
         // /thank-you would otherwise fire.

@@ -10,6 +10,7 @@ import {
 } from './briannaClient';
 import { toChips } from './briannaFilters';
 import { track } from '../../utils/analytics';
+import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
 
 const GOLD = '#D4AF37';
 // Brianna's persona avatar — headshot supplied by FYI, served from this app.
@@ -73,15 +74,22 @@ function LeadMiniForm({
     if (!/.+@.+\..+/.test(email.trim())) { setError('Please enter a valid email address.'); return; }
     setError(null);
     setSending(true);
+    const meta = metaLeadContext();
     const res = await submitBriannaLead({
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim() || undefined,
       interest: request.interest,
       company: company || undefined,
+      meta,
     });
     setSending(false);
     if (!res.ok) { setError(res.error || 'Something went wrong — please try again.'); return; }
+    void trackMetaLead({
+      contentName: 'Brianna chat — contact request',
+      user: { email: email.trim(), phone: phone.trim(), fullName: name.trim() },
+      eventId: meta.eventId,
+    });
     setSubmitted(true);
     onDone(name.trim());
   };

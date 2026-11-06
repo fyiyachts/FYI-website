@@ -10,6 +10,7 @@
 import { getAttribution } from '../../utils/attribution';
 import { track, trackAdsConversion } from '../../utils/analytics';
 import { identifyVisitor } from '../../utils/hubspotTracking';
+import { metaLeadContext, trackMetaLead, type MetaLeadContext } from '../../utils/metaPixel';
 import { LP_CONTEXT, LP_PATH } from './ccContent';
 
 /** Must match an option of FYI HubSpot's lead_source dropdown. */
@@ -78,10 +79,6 @@ function trackOpenAiLead(): void {
   // TODO(openai-pixel): fire OpenAI's lead event here.
 }
 
-declare global {
-  interface Window { fbq?: (...args: unknown[]) => void }
-}
-
 /** Phone-link clicks, as their own event (placement: header, form, cta-band…). */
 export function trackPhoneClick(placement: string): void {
   track('phone_click', { context: LP_CONTEXT, placement, page_path: LP_PATH });
@@ -101,11 +98,19 @@ export function firstLeadThisVisit(key: string): boolean {
 }
 
 /** Every conversion tag, once per visit; follow-up details get their own event. */
-function fireConversions(lead: CcLead): void {
+function fireConversions(lead: CcLead, meta: MetaLeadContext): void {
   if (firstLeadThisVisit('fyi_lp_cc_converted')) {
     track('generate_lead', { context: LP_CONTEXT, page_path: LP_PATH, lead_source: LEAD_SOURCE, form: lead.kind });
     trackAdsConversion(LP_CONTEXT);
-    // Meta Lead — fires when a Meta pixel is on the page (none is today).
+    // FYI Pixel Lead (utils/metaPixel.ts), with advanced matching.
+    void trackMetaLead({
+      contentName: `${LP_CONTEXT} — ${lead.kind === 'quick' ? 'contact form' : 'match questions'}`,
+      contentIds: lead.listing?.id ? [lead.listing.id] : undefined,
+      user: { email: lead.email, phone: lead.phone, fullName: lead.name },
+      eventId: meta.eventId,
+    });
+    // Plain 'track' = the other pixel on the page only (HubSpot's legacy
+    // pixel; metaPixel.ts keeps it away from FYI's). Left as it was.
     try { window.fbq?.('track', 'Lead'); } catch { /* noop */ }
     trackOpenAiLead();
   } else {
@@ -147,6 +152,7 @@ export async function submitCcLead(
   guard: { company: string; formOpenedAt: number },
 ): Promise<{ ok: boolean; error?: string }> {
   const l = lead.listing;
+  const meta = metaLeadContext();
   const res = await postLead({
     yacht: l
       ? { title: l.title, price: l.price, year: l.year, make: l.make, model: l.model, length: l.lengthFt ? `${l.lengthFt} ft` : undefined, location: l.location }
@@ -157,8 +163,9 @@ export async function submitCcLead(
     message: composeMessage(lead),
     attribution: getAttribution(),
     leadSource: LEAD_SOURCE,
+    meta,
     ...guard,
   });
-  if (res.ok) fireConversions(lead);
+  if (res.ok) fireConversions(lead, meta);
   return res;
 }

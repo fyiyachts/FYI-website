@@ -6,6 +6,7 @@ import { submitBriannaLead } from '../chat/briannaClient';
 import { sendVerificationCode, verifyCode } from '../../services/authService';
 import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track, trackAdsConversion } from '../../utils/analytics';
+import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
 import { formatMoney, listPrice, usdEquivalent } from '../../api/_lib/price';
@@ -356,6 +357,14 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
       // send_to the /thank-you page fires).
       track('generate_lead', { context: 'Yacht Match quiz', page_path: window.location.pathname });
       trackAdsConversion('Yacht Match quiz');
+      // FYI Pixel Lead — fired here, not from the Brianna delivery below, so
+      // the quiz counts once.
+      const meta = metaLeadContext();
+      void trackMetaLead({
+        contentName: 'Yacht Match quiz',
+        user: { email: email.trim(), phone: phone.trim(), firstName: first.trim(), lastName: last.trim() },
+        eventId: meta.eventId,
+      });
       // Also deliver through Brianna's pipeline so the FYI team gets the SMS
       // text (CRM site-inquiry webhook → Twilio), not just the HubSpot form
       // submission. Best-effort — never block or fail the quiz on this.
@@ -374,6 +383,7 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
         interest: summary,
         brands: likedBrands.length ? likedBrands : undefined,
         budget: budgetStr,
+        meta,
       }).catch(() => {});
       localStorage.setItem(DISMISS_KEY, '1');
       if (inline) {
