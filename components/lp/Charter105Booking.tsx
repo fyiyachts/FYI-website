@@ -15,6 +15,7 @@ import { track, trackAdsConversion } from '../../utils/analytics';
 import { getAttribution } from '../../utils/attribution';
 import { HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
+import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
 import FYILogo from '../layout/FYILogo';
 import { LP_PHONE_DISPLAY, LP_PHONE_TEL } from './ccContent';
 import { LP_WRAP } from './LpChrome';
@@ -203,6 +204,7 @@ function Booking({ onPhoneClick }: { onPhoneClick: PhoneClick }) {
       `Page: ${C105_PATH}`,
       `UTM: ${utm || 'none'}`,
     ].join('\n');
+    const meta = metaLeadContext();
     const res = await postLead({
       yacht: { title: '105′ Azimut — Daily Charter Special', price: `${usd(C105_PRICE)} / ${C105_HOURS} hours` },
       name: c.name.trim(),
@@ -211,6 +213,7 @@ function Booking({ onPhoneClick }: { onPhoneClick: PhoneClick }) {
       message,
       attribution: a,
       context: 'Charter Promo',
+      meta,
       company,
       formOpenedAt: openedAt.current,
     });
@@ -223,6 +226,14 @@ function Booking({ onPhoneClick }: { onPhoneClick: PhoneClick }) {
     if (firstLeadThisVisit('fyi_lp_c105_converted')) {
       track('generate_lead', { context: C105_CONTEXT, page_path: C105_PATH, value: total, currency: 'USD', payment: pay ?? undefined, slot: s.label });
       trackAdsConversion(C105_CONTEXT);
+      // FYI Pixel Lead (utils/metaPixel.ts), with advanced matching.
+      void trackMetaLead({
+        contentName: 'Charter request — 105′ Azimut Daily Charter Special',
+        user: { email: c.email.trim(), phone: c.phone.trim(), fullName: c.name.trim() },
+        eventId: meta.eventId,
+      });
+      // Plain 'track' = the other pixel on the page only (HubSpot's legacy
+      // pixel; metaPixel.ts keeps it away from FYI's). Left as it was.
       try { window.fbq?.('track', 'Lead'); } catch { /* noop */ }
     }
     identifyVisitor(c.email.trim());

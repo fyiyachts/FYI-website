@@ -5,6 +5,7 @@ import { YACHT_MATCH_ENABLED } from '../../utils/featureFlags';
 import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
+import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
 
 /**
  * Buyer tools for the listing detail pages, requested by FYI in the
@@ -158,6 +159,7 @@ export function InsuranceQuoteCta({
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setState('sending');
+    const meta = metaLeadContext();
     try {
       const res = await fetch('/api/contact/broker', {
         method: 'POST',
@@ -168,12 +170,17 @@ export function InsuranceQuoteCta({
           phone: phone || null,
           message: `Insurance quote request for ${yacht.title}. Please connect me with FYI's insurance partner.`,
           attribution: getAttribution(),
+          meta,
           ...guardFields(guard),
           yacht,
         }),
       });
       setState(res.ok ? 'sent' : 'error');
-      if (res.ok) identifyVisitor(email);
+      if (res.ok) {
+        identifyVisitor(email);
+        // FYI Pixel Lead; carries the DocumentID on /listing/<id> pages.
+        void trackMetaLead({ contentName: `Insurance quote — ${yacht.title}`, user: { email, phone, fullName: name }, eventId: meta.eventId });
+      }
     } catch {
       setState('error');
     }

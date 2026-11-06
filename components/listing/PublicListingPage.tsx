@@ -11,6 +11,7 @@ import { useJsonLd } from '../../utils/useJsonLd';
 import { Breadcrumbs } from '../public/Breadcrumbs';
 import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track } from '../../utils/analytics';
+import { trackMetaViewContent } from '../../utils/metaPixel';
 import { optImg, srcSet } from '../../utils/img';
 import { countryName } from '../../api/_lib/countryName';
 import { formatMoney, listPrice, usdEquivalent, type Money } from '../../api/_lib/price';
@@ -247,6 +248,13 @@ export default function PublicListingPage() {
     })();
     return () => { alive = false; ctl?.abort(); };
   }, [id, reload]);
+
+  // Meta ViewContent once the listing has loaded: DocumentID, "<year> <make>
+  // <model>", never the price.
+  useEffect(() => {
+    if (boat) trackMetaViewContent({ id: boat.id || id, year: boat.year, make: boat.make, model: boat.model, title: boat.title });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boat?.id]);
 
   // Co-brokerage boats: usable but not indexed (api/listing.ts sends the same
   // meta + X-Robots-Tag). Set for them, removed for every other boat — the SPA

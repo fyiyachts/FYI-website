@@ -6,9 +6,13 @@ import App from './App';
 import { initAnalytics } from './utils/analytics';
 import { initAttribution } from './utils/attribution';
 import { initHubspotTracking } from './utils/hubspotTracking';
+import { initMetaPixel } from './utils/metaPixel';
 
 initAnalytics();
 initAttribution();
+// Before HubSpot: HubSpot's ads tracking reuses window.fbq, and must find
+// FYI's stub (see utils/metaPixel.ts) rather than create its own.
+initMetaPixel();
 initHubspotTracking();
 
 const root = document.getElementById('root')!;
