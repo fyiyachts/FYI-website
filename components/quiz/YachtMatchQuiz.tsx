@@ -7,6 +7,7 @@ import { sendVerificationCode, verifyCode } from '../../services/authService';
 import { useLockBodyScroll } from '../../utils/useLockBodyScroll';
 import { track, trackAdsConversion } from '../../utils/analytics';
 import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 import { boatNameLine, yachtTitle } from '../../utils/boatTitle';
 import { optImg } from '../../utils/img';
 import { formatMoney, listPrice, usdEquivalent } from '../../api/_lib/price';
@@ -365,6 +366,7 @@ export default function YachtMatchQuiz({ inline = false }: { inline?: boolean })
         user: { email: email.trim(), phone: phone.trim(), firstName: first.trim(), lastName: last.trim() },
         eventId: meta.eventId,
       });
+      trackOpenAiLead(meta.eventId); // OpenAI (ChatGPT Ads) lead_created, same event ID
       // Also deliver through Brianna's pipeline so the FYI team gets the SMS
       // text (CRM site-inquiry webhook → Twilio), not just the HubSpot form
       // submission. Best-effort — never block or fail the quiz on this.

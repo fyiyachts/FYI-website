@@ -11,6 +11,7 @@ import {
 import { toChips } from './briannaFilters';
 import { track } from '../../utils/analytics';
 import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 
 const GOLD = '#D4AF37';
 // Brianna's persona avatar — headshot supplied by FYI, served from this app.
@@ -90,6 +91,7 @@ function LeadMiniForm({
       user: { email: email.trim(), phone: phone.trim(), fullName: name.trim() },
       eventId: meta.eventId,
     });
+    trackOpenAiLead(meta.eventId); // OpenAI (ChatGPT Ads) lead_created, same event ID
     setSubmitted(true);
     onDone(name.trim());
   };

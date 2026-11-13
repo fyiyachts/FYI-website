@@ -10,6 +10,7 @@ import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { metaLeadContext, trackMetaLead, trackMetaSearch } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 import { optImg, srcSet } from '../../utils/img';
 import { fetchJsonShared } from '../../utils/sharedFetch';
 import { FaqSection, CHARTER_FAQS, SELL_FAQS } from './Faq';
@@ -905,6 +906,7 @@ export function PublicInquiryForm({ context, dark = false, messagePlaceholder, i
       identifyVisitor(email);
       // FYI Pixel Lead. On /listing/<id> pages it carries the DocumentID.
       void trackMetaLead({ contentName: context, user: { email, phone, fullName: name }, eventId: meta.eventId });
+      trackOpenAiLead(meta.eventId); // OpenAI (ChatGPT Ads) lead_created, same event ID
       if (inlineConfirm) {
         // No navigation, so this form owns the conversion event that
         // /thank-you would otherwise fire.

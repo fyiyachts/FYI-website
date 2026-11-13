@@ -7,12 +7,15 @@ import { initAnalytics } from './utils/analytics';
 import { initAttribution } from './utils/attribution';
 import { initHubspotTracking } from './utils/hubspotTracking';
 import { initMetaPixel } from './utils/metaPixel';
+import { initOpenAiPixel } from './utils/openaiPixel';
 
 initAnalytics();
 initAttribution();
 // Before HubSpot: HubSpot's ads tracking reuses window.fbq, and must find
 // FYI's stub (see utils/metaPixel.ts) rather than create its own.
 initMetaPixel();
+// OpenAI (ChatGPT Ads) pixel, next to Meta's; same consent rules (utils/openaiPixel.ts).
+initOpenAiPixel();
 initHubspotTracking();
 
 const root = document.getElementById('root')!;
