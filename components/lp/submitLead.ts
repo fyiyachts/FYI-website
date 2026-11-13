@@ -11,6 +11,7 @@ import { getAttribution } from '../../utils/attribution';
 import { track, trackAdsConversion } from '../../utils/analytics';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { metaLeadContext, trackMetaLead, type MetaLeadContext } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 import { LP_CONTEXT, LP_PATH } from './ccContent';
 
 /** Must match an option of FYI HubSpot's lead_source dropdown. */
@@ -67,18 +68,6 @@ function composeMessage(lead: CcLead): string {
   ].filter(Boolean).join('\n');
 }
 
-/**
- * OpenAI Ads lead conversion.
- * TODO(openai-pixel): not wired. When the OpenAI Ads pixel is set up, set
- * VITE_OPENAI_PIXEL_ID, paste OpenAI's base snippet (Ads Manager → data
- * source) into this page, and fire its lead event here. Until then leads from
- * this page are identified by lead_source "ChatGPT Ads" and their UTMs.
- */
-function trackOpenAiLead(): void {
-  if (!import.meta.env.VITE_OPENAI_PIXEL_ID) return;
-  // TODO(openai-pixel): fire OpenAI's lead event here.
-}
-
 /** Phone-link clicks, as their own event (placement: header, form, cta-band…). */
 export function trackPhoneClick(placement: string): void {
   track('phone_click', { context: LP_CONTEXT, placement, page_path: LP_PATH });
@@ -112,7 +101,8 @@ function fireConversions(lead: CcLead, meta: MetaLeadContext): void {
     // Plain 'track' = the other pixel on the page only (HubSpot's legacy
     // pixel; metaPixel.ts keeps it away from FYI's). Left as it was.
     try { window.fbq?.('track', 'Lead'); } catch { /* noop */ }
-    trackOpenAiLead();
+    // OpenAI (ChatGPT Ads) pixel lead_created (utils/openaiPixel.ts), same event ID.
+    trackOpenAiLead(meta.eventId);
   } else {
     track('lp_lead_details', { context: LP_CONTEXT, form: lead.kind });
   }

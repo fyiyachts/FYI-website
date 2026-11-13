@@ -6,6 +6,7 @@ import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 
 /**
  * Buyer tools for the listing detail pages, requested by FYI in the
@@ -180,6 +181,7 @@ export function InsuranceQuoteCta({
         identifyVisitor(email);
         // FYI Pixel Lead; carries the DocumentID on /listing/<id> pages.
         void trackMetaLead({ contentName: `Insurance quote — ${yacht.title}`, user: { email, phone, fullName: name }, eventId: meta.eventId });
+        trackOpenAiLead(meta.eventId); // OpenAI (ChatGPT Ads) lead_created, same event ID
       }
     } catch {
       setState('error');
