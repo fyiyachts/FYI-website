@@ -124,10 +124,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 2. Diff against the stored history.
     const history = await getAllPriceRecords();
-    // First run: seed yesterday's exclusive prices from the old snapshot key,
-    // so a reduction made today is not lost to the storage change.
-    const legacy = history.size === 0 ? await kvGetJson<Record<string, number>>('price:snapshot').catch(() => null) : null;
-
     const changed = new Map<string, PriceRecord>();
     const removed: string[] = [];
     const reduced: Record<string, Reduction> = {};
@@ -148,9 +144,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
       delete rec.gone;
 
-      let before = prev?.price;
-      let beforeCurrency = prev?.currency;
-      if (!prev && legacy && typeof legacy[id] === 'number' && legacy[id] > 0) { before = legacy[id]; beforeCurrency = 'USD'; }
+      const before = prev?.price;
+      const beforeCurrency = prev?.currency;
+      // A "reduction" dated the day the boat was first recorded cannot have
+      // been observed: it came from the old price:snapshot key, which the
+      // first run used as a seed and which turned out to be of unknown age
+      // (2026-11-13). Its date would be wrong, so it is dropped.
+      if (rec.previousPrice && rec.lastChanged && rec.lastChanged === rec.firstSeen) {
+        delete rec.previousPrice;
+        delete rec.lastChanged;
+      }
 
       if (shown && before && beforeCurrency === shown.currency) {
         if (shown.amount <= before * (1 - MIN_DROP)) {
@@ -234,7 +237,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const cutoff = new Date(Date.parse(nowIso) - DROPS_TTL_DAYS * 864e5).toISOString().slice(0, 10);
       const drops = [...byId.values()]
-        .filter((d) => d.date >= cutoff && todayRows.get(String(d.id))?.type === 'e')
+        .filter((d) => d.date >= cutoff && todayRows.get(String(d.id))?.type === 'e' && reduced[String(d.id)])
         .sort((a, b) => (b.date < a.date ? -1 : b.date > a.date ? 1 : b.pct - a.pct))
         .slice(0, DROPS_CAP);
       await kvSetJson('price:drops', drops);

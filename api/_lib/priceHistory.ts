@@ -5,7 +5,8 @@
 // PriceHideInd only, and OriginalPrice is the price in the listing's original
 // currency, NOT a pre-reduction price). So api/cron/price-snapshot.ts records
 // every active boat's asking price once a day and notes when it goes down.
-// Reductions therefore exist only from the first snapshot forward.
+// Reductions therefore exist only from the first snapshot forward: a price
+// that went down before then cannot be dated, so it is not shown.
 //
 // Storage (all written by the cron, read by everything else):
 //   price:hist:<0-9>     hash, DocumentID → PriceRecord JSON. Ten hashes keyed
@@ -69,6 +70,8 @@ const daysAgo = (n: number): string => new Date(Date.now() - n * 864e5).toISOStr
 export function reductionOf(rec: PriceRecord | null | undefined, now = today()): Reduction | null {
   if (!rec || rec.gone || !rec.price || !rec.previousPrice || !rec.lastChanged) return null;
   if (rec.previousPrice <= rec.price) return null;
+  // A drop can only be observed on a day after the boat was first recorded.
+  if (rec.lastChanged <= rec.firstSeen) return null;
   const cutoff = new Date(Date.parse(now) - REDUCED_WINDOW_DAYS * 864e5).toISOString().slice(0, 10);
   if (rec.lastChanged < cutoff) return null;
   return {
