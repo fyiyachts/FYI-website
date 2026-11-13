@@ -164,3 +164,41 @@
     max-height: calc(100dvh - 13rem);
   }
 }
+
+/* Listing descriptions (api/_lib/listingContent.ts): cleaned feed HTML — only
+   p, br, ul, ol, li, strong, b, em, i, h3, h4 and tables, no attributes — so
+   it is styled here by element. Used by the React listing page and by the
+   server-rendered copy in api/listing.ts. */
+.listing-prose {
+  font-size: 14.5px;
+  font-weight: 300;
+  line-height: 1.85;
+  color: color-mix(in srgb, var(--color-yacht-900) 82%, transparent);
+  overflow-wrap: anywhere;
+}
+.listing-prose > * + * { margin-top: 0.9em; }
+.listing-prose p + p { margin-top: 0.9em; }
+.listing-prose strong, .listing-prose b { font-weight: 600; color: var(--color-yacht-900); }
+.listing-prose h3, .listing-prose h4 {
+  margin-top: 1.4em;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-yacht-900);
+}
+.listing-prose ul, .listing-prose ol { padding-left: 1.25em; }
+.listing-prose ul { list-style: disc; }
+.listing-prose ol { list-style: decimal; }
+.listing-prose ul ul { list-style: circle; }
+.listing-prose li + li { margin-top: 0.3em; }
+.listing-prose li > p { margin: 0; }
+.listing-prose li::marker { color: var(--color-yacht-brand); }
+.listing-prose table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 13.5px; }
+.listing-prose td, .listing-prose th {
+  padding: 0.45em 0.9em 0.45em 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-yacht-900) 10%, transparent);
+  text-align: left;
+  vertical-align: top;
+}
+.listing-prose th { font-weight: 600; color: var(--color-yacht-900); }

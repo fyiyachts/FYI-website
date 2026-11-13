@@ -41,6 +41,24 @@ export const PLS_FIELDS = [
   'LastModificationDate', 'ItemReceivedDate', 'IMTTimeStamp',
 ].join(',');
 
+/**
+ * Extra spec fields for the single-listing lookup (the dynamic spec table,
+ * api/_lib/specFields.ts). The exclusives feed returns all of these; PLS needs
+ * each one named, and these names have not been verified against it — so they
+ * are only ever requested through plsGetById, which falls back to PLS_FIELDS
+ * if PLS rejects the longer list (see plsDetailFields).
+ */
+export const PLS_EXTRA_FIELDS = [
+  'PriceQualifier', 'SavingsPrice', 'TaxStatusCode', 'RegistrationCountryCode',
+  'WarrantyPeriod', 'WarrantyExpirationDate',
+  'DriveUp', 'KeelUp', 'KeelDown', 'FreeBoardMeasure', 'CabinHeadroomMeasure', 'DeadriseMeasure',
+  'DisplacementTypeCode', 'BallastWeightMeasure', 'BoatKeelCode', 'PropellerCruisingSpeed',
+  'FuelTankCountNumeric', 'FuelTankMaterialCode', 'WaterTankCountNumeric', 'WaterTankMaterialCode',
+  'HoldingTankCountNumeric', 'HoldingTankMaterialCode',
+  'SingleBerthsCountNumeric', 'DoubleBerthsCountNumeric', 'TwinBerthsCountNumeric',
+  'ConvertibleSaloonIndicator', 'WindlassTypeCode', 'ElectricalCircuitMeasure', 'TrimTabsIndicator',
+].join(',');
+
 /** Fields for grid/search rows: enough for a card, a fraction of the payload. */
 export const PLS_CARD_FIELDS = [
   'DocumentID', 'SalesStatus', 'MakeString', 'Model', 'ModelYear', 'BoatName',
@@ -76,7 +94,7 @@ export interface PlsResult { numResults: number; results: Record<string, any>[] 
 
 export async function plsSearch(
   query: Record<string, string | undefined>,
-  opts: { fields?: string; cardOnly?: boolean } = {},
+  opts: { fields?: string; cardOnly?: boolean; timeoutMs?: number } = {},
 ): Promise<PlsResult> {
   if (!PLS_KEY) return { numResults: 0, results: [] };
   const url = new URL(PLS_URL);
@@ -89,7 +107,7 @@ export async function plsSearch(
 
   const res = await fetch(url.toString(), {
     headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS),
   });
   const body: any = await res.json().catch(() => null);
   if (!res.ok || !body || body.status !== 'success' || !body.data) {
@@ -130,12 +148,76 @@ export async function plsGetDisclaimer(id: string): Promise<string | undefined> 
 const toPlainText = (html: string): string =>
   html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
+// Whether PLS accepts PLS_EXTRA_FIELDS. Unknown until tried; a rejection is
+// remembered for six hours so a bad field name costs one extra call, not one
+// per listing view.
+let extraFieldsOffUntil = 0;
+
+async function plsDetailSearch(id: string): Promise<PlsResult> {
+  const query = { documentid: id, rows: '1' };
+  if (Date.now() >= extraFieldsOffUntil) {
+    try {
+      const full = await plsSearch(query, { fields: `${PLS_FIELDS},${PLS_EXTRA_FIELDS}` });
+      // A boat that exists comes back; "no rows" with the long list is
+      // re-checked with the known-good list before it is believed.
+      if (full.results.length) return full;
+    } catch (err: any) {
+      console.warn('[pls] extended field list rejected, using base list:', err?.message || err);
+      extraFieldsOffUntil = Date.now() + 6 * 60 * 60 * 1000;
+    }
+  }
+  return plsSearch(query);
+}
+
+/**
+ * Every active co-brokerage row, for the sitemaps and the daily price
+ * snapshot. `fields` should be small (no Images: ~9,000 boats). The page size
+ * PLS actually returns is read from the first response, so a server-side cap
+ * on `rows` only costs more calls. Throws if any page fails — callers must
+ * never mistake half a feed for the whole of it.
+ */
+export async function plsFetchAll(
+  fields: string,
+  opts: { start?: number; limit?: number; pageRows?: number; concurrency?: number } = {},
+): Promise<{ numResults: number; results: Record<string, any>[] }> {
+  const from = opts.start ?? 0;
+  const want = opts.pageRows ?? 500;
+  // Date first listed: the one order verified to be stable enough to page on.
+  const page = (start: number, rows: number) =>
+    plsSearch({ rows: String(rows), start: String(start), sort: 'ItemReceivedDate|desc' }, { fields, timeoutMs: 20_000 });
+  // The largest page PLS allows is not documented (the site itself never asks
+  // for more than 48). If a big page is refused outright, step down.
+  let first: PlsResult | undefined;
+  let lastError: unknown;
+  for (const rows of [...new Set([want, 100, 48])].filter((r) => r <= want)) {
+    try {
+      first = await page(from, Math.min(rows, opts.limit ?? rows));
+      break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (!first) throw lastError;
+  const until = Math.min(first.numResults, from + (opts.limit ?? Infinity));
+  const size = first.results.length;
+  const results = [...first.results];
+  if (!size) return { numResults: first.numResults, results };
+  const starts: number[] = [];
+  for (let s = from + size; s < until; s += size) starts.push(s);
+  const width = opts.concurrency ?? 4;
+  for (let i = 0; i < starts.length; i += width) {
+    const pages = await Promise.all(starts.slice(i, i + width).map((s) => page(s, Math.min(size, until - s))));
+    for (const p of pages) results.push(...p.results);
+  }
+  return { numResults: first.numResults, results };
+}
+
 /** One co-brokerage boat by DocumentID, full detail. Undefined when not found. */
 export async function plsGetById(id: string): Promise<Record<string, any> | undefined> {
   if (!PLS_KEY || !/^\d+$/.test(id)) return undefined;
   // The disclaimer is fine print: its failure never fails the listing.
   const [{ results }, disclaimer] = await Promise.all([
-    plsSearch({ documentid: id, rows: '1' }),
+    plsDetailSearch(id),
     plsGetDisclaimer(id).catch(() => undefined),
   ]);
   const item = results.find((r) => String(r.DocumentID) === id);

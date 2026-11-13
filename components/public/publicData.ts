@@ -200,6 +200,23 @@ export async function searchCobrokerage(
   };
 }
 
+/**
+ * Co-brokerage boats with a recorded price reduction in the last 90 days —
+ * the "Price reduced" filter. PLS cannot search on it, so the daily price
+ * snapshot keeps their card rows (/api/yachts/price-drops?cards=1). FYI's own
+ * reduced boats are already in the exclusives list and are left out here.
+ */
+export async function fetchReducedCobrokerage(signal?: AbortSignal): Promise<PublicBoat[]> {
+  const res = await fetch('/api/yachts/price-drops?cards=1', { credentials: 'same-origin', signal });
+  if (!res.ok) throw new Error(`price-drops ${res.status}`);
+  const data = await res.json();
+  const items: any[] = Array.isArray(data?.results) ? data.results : [];
+  return items
+    .filter((it) => it?.ListingType === 'cobrokerage')
+    .map(normalizePublicBoat)
+    .filter((b): b is PublicBoat => b !== null && !isFyiCompany(b.company));
+}
+
 let inventoryCache: { boats: PublicBoat[]; at: number } | null = null;
 const INVENTORY_TTL_MS = 2 * 60 * 1000;
 

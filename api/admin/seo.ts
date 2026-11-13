@@ -41,6 +41,7 @@ const KNOWN_SITEMAPS = new Set([
   ...OWN_SITEMAPS,
   `${SITE}/sitemap-pages.xml`,
   `${SITE}/sitemap-listings.xml`,
+  `${SITE}/sitemap-listings-exclusive.xml`,
 ]);
 
 const sitemapApi = (siteUrl: string, feedpath?: string) =>
@@ -67,7 +68,8 @@ async function report(token: string, siteUrl: string) {
   ]);
   // Anything Google still holds that this site no longer publishes — the
   // Yoast leftovers (/sitemap_index.xml, /page-sitemap.xml) that 404 now.
-  const stale = sitemaps.filter((s: any) => !KNOWN_SITEMAPS.has(s.path));
+  const stale = sitemaps.filter((s: any) =>
+    !KNOWN_SITEMAPS.has(s.path) && !/\/sitemap-listings-cobrokerage-\d+\.xml$/.test(String(s.path)));
   return { sitemaps, stale: stale.map((s: any) => s.path), indexNow: { key: indexNowKey(), ...keyFile } };
 }
 

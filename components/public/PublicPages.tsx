@@ -26,11 +26,14 @@ import { getBrandDetail } from './brandContent';
 import { SellScrollHero } from './scrollWorld/SellScrollHero';
 import {
   BRAND_PAGES, CATEGORY_PAGES, brandMake, brandSeoTitle, brandSeoDescription,
-  fetchActiveInventory, searchCobrokerage,
+  fetchActiveInventory, fetchReducedCobrokerage, searchCobrokerage,
   fmtBoatPrice, normalizePublicBoat,
   compareSold, soldWindowStart,
   type BrandPage, type CategoryPage, type PublicBoat,
 } from './publicData';
+import { formatMoney } from '../../api/_lib/price';
+import { fmtDate } from '../../api/_lib/specFields';
+import { reductionFor, useReducedPrices, type ReducedMap } from '../../utils/useReducedPrices';
 
 /**
  * Public SEO pages mirroring fyiyachts.com's URL structure (exact slugs)
@@ -156,7 +159,10 @@ export function ImagePageHero({
 
 /* --------------------------------------------------------- boat grid */
 
-function BoatCard({ boat, priority = false }: { boat: PublicBoat; priority?: boolean }) {
+function BoatCard({ boat, priority = false, reduced }: { boat: PublicBoat; priority?: boolean; reduced?: ReducedMap }) {
+  // "Price Reduced" for 90 days after a recorded drop (daily price snapshot);
+  // never when the price is hidden.
+  const reduction = reduced ? reductionFor(reduced, boat.id, boat.listPrice) : undefined;
   // Only FYI's own boats have a /listing/:id page. Anything external with no
   // detail page falls back to the enquiry form, vessel pre-filled.
   // Co-brokerage boats (BoatsGroup PLS) have full /listing/:id pages too.
@@ -187,9 +193,18 @@ function BoatCard({ boat, priority = false }: { boat: PublicBoat; priority?: boo
           ) : (
             <div className="flex h-full items-center justify-center"><Anchor className="h-8 w-8 text-yacht-900/20" /></div>
           )}
-          {badge ? (
-            <span className={`absolute bottom-3 left-4 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] backdrop-blur-sm ${boat.source === 'fyi' ? 'bg-yacht-brand text-white' : 'bg-white/90 text-yacht-900'}`}>
-              {badge}
+          {badge || reduction ? (
+            <span className="absolute bottom-3 left-4 flex flex-wrap gap-1.5">
+              {badge ? (
+                <span className={`px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] backdrop-blur-sm ${boat.source === 'fyi' ? 'bg-yacht-brand text-white' : 'bg-white/90 text-yacht-900'}`}>
+                  {badge}
+                </span>
+              ) : null}
+              {reduction ? (
+                <span className="bg-yacht-900/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
+                  Price Reduced
+                </span>
+              ) : null}
             </span>
           ) : null}
           {boat.lengthFt ? (
@@ -207,8 +222,20 @@ function BoatCard({ boat, priority = false }: { boat: PublicBoat; priority?: boo
             <span className="flex items-center gap-1.5 text-[12px] font-light text-yacht-900/55">
               {boat.city || boat.state || boat.country ? (<><MapPin className="h-3.5 w-3.5" />{[boat.city, boat.state || boat.country].filter(Boolean).join(', ')}</>) : boat.model}
             </span>
-            <span className="text-sm font-semibold text-yacht-900">{fmtBoatPrice(boat)}</span>
+            <span className="text-right text-sm font-semibold text-yacht-900">
+              {reduction ? (
+                <s className="mr-1.5 text-[12px] font-light text-yacht-900/45">
+                  <span className="sr-only">was </span>{formatMoney({ amount: reduction.previous, currency: reduction.currency })}
+                </s>
+              ) : null}
+              {fmtBoatPrice(boat)}
+            </span>
           </div>
+          {reduction ? (
+            <p className="mt-1.5 text-right text-[11px] font-light text-yacht-900/50">
+              Reduced {fmtDate(reduction.date)} · was {formatMoney({ amount: reduction.previous, currency: reduction.currency })}
+            </p>
+          ) : null}
         </div>
       </a>
     </article>
@@ -250,9 +277,11 @@ interface Filters {
   maxPrice: string;
   year: string;
   condition: string;
+  /** '1' = only boats with a recorded price reduction in the last 90 days. */
+  reduced: string;
 }
 const EMPTY_FILTERS: Filters = {
-  q: '', make: '', type: '', minLen: '', maxLen: '', minPrice: '', maxPrice: '', year: '', condition: '',
+  q: '', make: '', type: '', minLen: '', maxLen: '', minPrice: '', maxPrice: '', year: '', condition: '', reduced: '',
 };
 
 /** Legacy `60-80` / `3000000-999999999` bucket → [min, max]. */
@@ -278,6 +307,7 @@ export function readFilters(params: URLSearchParams): Filters {
     maxPrice: params.get('maxPrice') ?? bPriceMax,
     year: params.get('year') ?? '',
     condition: params.get('condition') ?? '',
+    reduced: params.get('reduced') === '1' ? '1' : '',
   };
 }
 
@@ -327,6 +357,7 @@ function chipLabel(k: keyof Filters, v: string): string {
     case 'maxPrice': return `under ${compactUsd(numOr(v, 0))}`;
     case 'year': return `${v} & newer`;
     case 'condition': return v === 'new' ? 'New' : 'Pre-owned';
+    case 'reduced': return 'Price reduced';
     default: return v;
   }
 }
@@ -466,6 +497,16 @@ function FilterBar({ boats, filters, onChange }: { boats: PublicBoat[]; filters:
             <option value="used">Pre-owned</option>
           </select>
         </div>
+        {/* Boats whose asking price went down in the last 90 days (daily price snapshot). */}
+        <label className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-yacht-900/20 bg-white px-3 py-2.5 text-[13px] text-yacht-900 sm:w-auto">
+          <input
+            type="checkbox"
+            checked={filters.reduced === '1'}
+            onChange={e => set('reduced', e.target.checked ? '1' : '')}
+            className="h-4 w-4 accent-yacht-brand"
+          />
+          Price reduced
+        </label>
       </div>
 
       {activeKeys.length > 0 && (
@@ -682,7 +723,12 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
   };
   const setFilters = (f: Filters) => writeParams(f, sort);
 
-  const exclusives = useMemo(() => sortBoats(applyFilters(boats, filters), sort), [boats, filters, sort]);
+  const reducedMap = useReducedPrices();
+  const onlyReduced = filters.reduced === '1';
+  const exclusives = useMemo(() => {
+    const list = applyFilters(boats, filters);
+    return sortBoats(onlyReduced ? list.filter(b => reductionFor(reducedMap, b.id, b.listPrice)) : list, sort);
+  }, [boats, filters, sort, onlyReduced, reducedMap]);
 
   // Meta Search: the visitor's active search / filters, once they stop typing.
   const searchString = (Object.keys(filters) as (keyof Filters)[])
@@ -708,7 +754,21 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
     const ctl = new AbortController();
     inflight.current = ctl;
     setCo(c => ({ ...(reset ? CO_EMPTY : c), loading: true, error: false }));
-    searchCobrokerage(JSON.parse(request), start, PAGE_SIZE, ctl.signal)
+    const req: Record<string, string> = JSON.parse(request);
+    // "Price reduced": PLS cannot search on it, so the reduced co-brokerage
+    // boats come from the price snapshot (one small list, no paging) and the
+    // page's scope and the visitor's filters are applied here.
+    const search = req.reduced === '1'
+      ? fetchReducedCobrokerage(ctl.signal).then(all => {
+          const { reduced: _r, sort: _s, state, country, ...rest } = req;
+          const inPlace = (b: PublicBoat) =>
+            (!state || (b.state ?? '').toLowerCase() === state.toLowerCase()) &&
+            (!country || (b.country ?? '').toLowerCase() === country.toLowerCase());
+          const boats = sortBoats(applyFilters(all.filter(inPlace), { ...EMPTY_FILTERS, ...rest }), sort);
+          return { boats, numResults: boats.length, dropped: 0, nextStart: boats.length, hasMore: false };
+        })
+      : searchCobrokerage(req, start, PAGE_SIZE, ctl.signal);
+    search
       .then(page => {
         if (ctl.signal.aborted) return;
         setCo(c => {
@@ -813,7 +873,7 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
       ) : (
         <>
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {shownExclusives.map((b, i) => <BoatCard key={`fyi-${b.id}`} boat={b} priority={i < 6} />)}
+            {shownExclusives.map((b, i) => <BoatCard key={`fyi-${b.id}`} boat={b} priority={i < 6} reduced={reducedMap} />)}
             {shownExclusives.length > 0 && shownCo.length > 0 && (
               <div className="col-span-full flex items-center gap-4 py-2" role="separator">
                 <span className="h-px flex-1 bg-yacht-900/15" />
@@ -821,7 +881,7 @@ function InventoryGrid({ make, filter, scope, emptyNote }: {
                 <span className="h-px flex-1 bg-yacht-900/15" />
               </div>
             )}
-            {shownCo.map((b, i) => <BoatCard key={`co-${b.id}`} boat={b} priority={shownExclusives.length + i < 6} />)}
+            {shownCo.map((b, i) => <BoatCard key={`co-${b.id}`} boat={b} priority={shownExclusives.length + i < 6} reduced={reducedMap} />)}
           </div>
           {canShowMore && (
             <div className="mt-10 text-center">

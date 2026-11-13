@@ -126,6 +126,15 @@
       ]
     },
     {
+      "source": "/api/((?!listing$|sitemap-listings$|not-found$|llms-inventory$|img$|yacht-redirect$).*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
       "source": "/thank-you",
       "headers": [
         {
@@ -219,8 +228,20 @@
       "destination": "/api/llms-inventory"
     },
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap-listings?type=index"
+    },
+    {
       "source": "/sitemap-listings.xml",
-      "destination": "/api/sitemap-listings"
+      "destination": "/api/sitemap-listings?type=exclusive"
+    },
+    {
+      "source": "/sitemap-listings-exclusive.xml",
+      "destination": "/api/sitemap-listings?type=exclusive"
+    },
+    {
+      "source": "/sitemap-listings-cobrokerage-:page(\\d+).xml",
+      "destination": "/api/sitemap-listings?type=cobrokerage&page=:page"
     },
     {
       "source": "/listing/:id",
