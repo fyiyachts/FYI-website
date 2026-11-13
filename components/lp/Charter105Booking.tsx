@@ -16,6 +16,7 @@ import { getAttribution } from '../../utils/attribution';
 import { HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 import FYILogo from '../layout/FYILogo';
 import { LP_PHONE_DISPLAY, LP_PHONE_TEL } from './ccContent';
 import { LP_WRAP } from './LpChrome';
@@ -232,6 +233,7 @@ function Booking({ onPhoneClick }: { onPhoneClick: PhoneClick }) {
         user: { email: c.email.trim(), phone: c.phone.trim(), fullName: c.name.trim() },
         eventId: meta.eventId,
       });
+      trackOpenAiLead(meta.eventId); // OpenAI (ChatGPT Ads) lead_created, same event ID
       // Plain 'track' = the other pixel on the page only (HubSpot's legacy
       // pixel; metaPixel.ts keeps it away from FYI's). Left as it was.
       try { window.fbq?.('track', 'Lead'); } catch { /* noop */ }

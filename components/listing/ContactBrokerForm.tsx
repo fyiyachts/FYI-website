@@ -7,6 +7,7 @@ import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard'
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { track, trackAdsConversion } from '../../utils/analytics';
 import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 
 interface Props {
   yacht: YachtListing;
@@ -68,6 +69,7 @@ export default function ContactBrokerForm({ yacht }: Props) {
         user: { email, phone, fullName: name },
         eventId: meta.eventId,
       });
+      trackOpenAiLead(meta.eventId); // OpenAI (ChatGPT Ads) lead_created, same event ID
       setSent(true);
     } catch (err: any) {
       setError(err.message || 'Failed to send inquiry.');

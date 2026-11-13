@@ -29,6 +29,7 @@ import { getAttribution } from '../../utils/attribution';
 import { useFormGuard, guardFields, HoneypotField } from '../../utils/formGuard';
 import { identifyVisitor } from '../../utils/hubspotTracking';
 import { metaLeadContext, trackMetaLead } from '../../utils/metaPixel';
+import { trackOpenAiLead } from '../../utils/openaiPixel';
 import { VOICE_SEARCH_ENABLED, SPANISH_ENABLED } from '../../utils/featureFlags';
 import { languageToggleTarget } from '../es/esRoutes';
 import { FYI_TEAM, repKey } from '../team/fyiTeam';
@@ -2236,6 +2237,7 @@ function ContactBand() {
       trackEvent('generate_lead', { context: 'homepage_contact_band' });
       identifyVisitor(email);
       void trackMetaLead({ contentName: `Homepage contact — ${interest || 'private inquiry'}`, user: { email, fullName: name }, eventId: meta.eventId });
+      trackOpenAiLead(meta.eventId); // OpenAI (ChatGPT Ads) lead_created, same event ID
       setState('sent');
     } catch {
       setState('error');
