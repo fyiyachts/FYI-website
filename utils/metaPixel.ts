@@ -24,15 +24,23 @@
 //     route-change PageViews are mirrored to it (see trackMetaPageView).
 //
 // ─── Consent ───────────────────────────────────────────────────────────────
-// The pixel starts with consent revoked and nothing is sent until consent is
-// granted; fbevents holds the queued events and sends them on grant (tested).
-// fbevents.js itself is only loaded after the first grant. The consent
-// source is HubSpot's cookie-consent API (_hsp addPrivacyConsentListener,
-// "advertisement" category): with no HubSpot cookie banner configured,
-// HubSpot reports consent as given and the pixel runs for everyone; once a
-// banner is switched on in HubSpot (Settings → Privacy & consent → Cookies),
-// the pixel follows the visitor's choice with no code change. setMetaConsent()
-// is exported for a site-built banner, should one replace HubSpot's.
+// The pixel starts with consent revoked; fbevents holds queued events and
+// sends them once consent is granted. fbevents.js itself loads on the first
+// grant. Who gets granted (decideConsent below):
+//   1. A choice the visitor already made in HubSpot's cookie banner (its
+//      __hs_opt_out / __hs_cookie_cat_pref cookies, "advertisement" = 2) wins.
+//   2. Outside the EU/EEA, UK, Switzerland and Turkey (visitor's country from
+//      Vercel's IP geolocation, /api/geo): granted by default. No banner is
+//      shown there, so there is nothing to wait for.
+//   3. Inside those regions: wait for HubSpot's addPrivacyConsentListener
+//      ("advertisement"). If no HubSpot banner appears within a few seconds
+//      and HubSpot hasn't answered, the banner is off: granted.
+// HubSpot's listener is still followed whenever it answers, but a "no" only
+// counts in the regions above or as a stored choice: with no banner shown,
+// nobody declined anything. (The first version waited for that listener
+// alone; with no banner configured it never fired, and the pixel sent
+// nothing — found 2026-11-06.) setMetaConsent() is exported for a
+// site-built banner, should one replace HubSpot's.
 //
 // ─── Where it runs ─────────────────────────────────────────────────────────
 // Production builds only, never `vite dev`, and not on localhost / LAN
@@ -189,13 +197,61 @@ export function initMetaPixel(): void {
   fbq('init', META_PIXEL_ID);
   if (window.fbq && !initialisedPixels.size) initialisedPixels.add(META_PIXEL_ID);
 
-  // Consent comes from HubSpot's cookie-consent API ("advertisement").
-  window._hsp = window._hsp || [];
-  window._hsp.push(['addPrivacyConsentListener', (c: HubspotConsent) => {
-    setMetaConsent(Boolean(c?.categories ? c.categories.advertisement : c?.allowed));
-  }]);
+  decideConsent();
 
   document.addEventListener('click', onContactClick, true);
+}
+
+/* -------------------------------------------------------------- consent */
+
+/** Where a cookie banner is (or may be) shown: EU/EEA, UK, Switzerland, Turkey. */
+const CONSENT_REGION = new Set([
+  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU',
+  'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', // EU
+  'IS', 'LI', 'NO', // EEA
+  'GB', 'CH', 'TR',
+]);
+/** How long a consent-region visitor waits for HubSpot's banner before it counts as off. */
+const BANNER_WAIT_MS = 4000;
+
+/** The visitor's stored HubSpot cookie choice for advertising; null when they never made one. */
+function storedHubspotChoice(): boolean | null {
+  if (readCookie('__hs_opt_out') === 'yes') return false;
+  const pref = readCookie('__hs_cookie_cat_pref'); // e.g. "1:true,2:false,3:true"
+  const ad = pref ? /(?:^|[,_])2:(true|false)/.exec(pref) : null;
+  if (ad) return ad[1] === 'true';
+  if (readCookie('__hs_opt_out') === 'no') return true;
+  return null;
+}
+
+const hubspotBannerShown = (): boolean => !!document.getElementById('hs-eu-cookie-confirmation');
+
+function decideConsent(): void {
+  let consentRegion: boolean | null = null; // null until the country is known
+  let hubspotAnswered = false;
+
+  // HubSpot's cookie-consent API, whenever it answers.
+  window._hsp = window._hsp || [];
+  window._hsp.push(['addPrivacyConsentListener', (c: HubspotConsent) => {
+    const granted = Boolean(c?.categories ? c.categories.advertisement : c?.allowed);
+    hubspotAnswered = true;
+    log('HubSpot consent', granted);
+    // A "no" without a banner isn't anyone's choice: only follow it in the
+    // consent regions or when the visitor stored one.
+    if (granted || consentRegion === true || storedHubspotChoice() === false) setMetaConsent(granted);
+  }]);
+
+  const stored = storedHubspotChoice();
+  if (stored !== null) { setMetaConsent(stored); return; }
+
+  void visitorCountry().then((country) => {
+    consentRegion = !!country && CONSENT_REGION.has(country.toUpperCase());
+    if (!consentRegion) { setMetaConsent(true); return; } // no banner outside these regions
+    window.setTimeout(() => {
+      // Banner off (nothing shown, HubSpot silent): nothing to wait for.
+      if (!hubspotAnswered && !hubspotBannerShown()) setMetaConsent(true);
+    }, BANNER_WAIT_MS);
+  });
 }
 
 /* --------------------------------------------------------------- events */
