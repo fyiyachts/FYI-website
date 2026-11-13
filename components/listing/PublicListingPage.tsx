@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Anchor, Camera, ChevronLeft, ChevronRight, Loader2, Share2, X } from 'lucide-react';
 import { FinanceCalculator, InsuranceQuoteCta } from './BuyerTools';
-import { ListingDescription, ListingDisclaimer, SpecGroups } from './ListingDetails';
+import { ListingDescription, ListingDisclaimer, ListingSections, SpecGroups } from './ListingDetails';
 import { buildSpecGroups, fmtDate, unmappedFields } from './specFields';
 import { AiOverview, ContactButtons, LocationMap, MoreLikeThis, RecentlySoldStrip, StickyMobileCta } from './ListingExtras';
 import { CreateYachtProfileCta } from './CreateYachtProfileCta';
@@ -471,7 +471,10 @@ export default function PublicListingPage() {
             </div>
           </section>
 
+          {/* Order (client, 2026-11-13): description, specifications, then the
+              longer detail sections as drop-downs. api/listing.ts matches. */}
           <SpecGroups groups={specGroups} />
+          <ListingSections sections={boat.content.sections} />
 
           {/* City-level location map — never an exact berth */}
           <LocationMap location={boat.location} />

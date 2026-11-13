@@ -8,8 +8,8 @@
 // what the client renders.
 //
 // What a crawler that runs no JavaScript gets (2026-11-13): H1, price or
-// "Price on request", location, the full cleaned description and every detail
-// section, the full dynamic spec table, price-reduced status, every photo URL
+// "Price on request", location, the full cleaned description, the full dynamic spec
+// table, then every detail section (in that order), price-reduced status, every photo URL
 // with alt text, the co-brokerage courtesy line, and links to the inventory,
 // the make's search and 4–6 similar boats. FYI exclusives and co-brokerage
 // boats are rendered — and indexed — the same way.
@@ -280,8 +280,9 @@ ${content.descriptionHtml
     ? `<div class="listing-prose mt-5">${content.descriptionHtml}</div>`
     : content.sections.length ? '' : '<p class="mt-4 text-[14px] font-light text-yacht-900/50">Full details available on request \u2014 enquire and a broker will send the complete specification.</p>'}
 </section>
-${content.sections.map((s) => `<section class="mt-8 border-t border-yacht-900/10 pt-6"><h3 class="text-[13px] font-semibold uppercase tracking-[0.2em] text-yacht-900">${esc(s.title)}</h3><div class="listing-prose mt-3">${s.html}</div></section>`).join('\n')}
 ${specsHtml(groups)}
+${content.sections.length ? `<section class="mt-12"><h2 class="font-serif text-2xl italic tracking-wide text-yacht-900">Full Details</h2>
+${content.sections.map((s) => `<section class="mt-6 border-t border-yacht-900/10 pt-6"><h3 class="text-[13px] font-semibold uppercase tracking-[0.2em] text-yacht-900">${esc(s.title)}</h3><div class="listing-prose mt-3">${s.html}</div></section>`).join('\n')}</section>` : ''}
 ${seo.images.length > 1 ? `<section class="mt-12"><h2 class="font-serif text-2xl italic tracking-wide text-yacht-900">Photos (${seo.images.length})</h2>
 <ul class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">${seo.images.slice(1).map((im) => `<li><a href="${esc(im.url)}"><img src="${esc(bgResizeUrl(im.url, 640) || im.url)}" alt="${esc(im.alt)}" width="640" height="480" loading="lazy" class="aspect-[4/3] w-full object-cover" /></a></li>`).join('')}</ul></section>` : ''}
 ${similarHtml(similar, 'Similar yachts for sale')}

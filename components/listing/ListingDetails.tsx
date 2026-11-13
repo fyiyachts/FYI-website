@@ -19,11 +19,30 @@ const heading = 'font-serif text-2xl italic tracking-wide text-yacht-900';
 /** How many detail sections start open; the rest are collapsed. */
 const OPEN_BY_DEFAULT = 2;
 
+/** The main description. Order on the page: description → specifications → detail sections. */
 export function ListingDescription({ content }: { content: ListingContent }) {
   const { descriptionHtml, sections } = content;
+  if (descriptionHtml) {
+    return <div className="listing-prose mt-6" dangerouslySetInnerHTML={{ __html: descriptionHtml }} />;
+  }
+  if (sections.length) return null;
+  return (
+    <p className="mt-4 text-[14px] font-light text-yacht-900/50">
+      Full details available on request — enquire and a broker will send the complete specification.
+    </p>
+  );
+}
+
+/**
+ * The feed's longer detail sections (Key Features, Construction, Machinery…)
+ * as drop-downs under the specification table: first two open, the rest
+ * collapsed, with "Expand all".
+ */
+export function ListingSections({ sections }: { sections: ListingContent['sections'] }) {
   const [open, setOpen] = useState<Set<number>>(
     () => new Set(Array.from({ length: Math.min(OPEN_BY_DEFAULT, sections.length) }, (_, i) => i)),
   );
+  if (!sections.length) return null;
   const allOpen = open.size === sections.length;
   const toggle = (i: number) => setOpen((prev) => {
     const next = new Set(prev);
@@ -31,60 +50,46 @@ export function ListingDescription({ content }: { content: ListingContent }) {
     return next;
   });
 
-  if (!descriptionHtml && !sections.length) {
-    return (
-      <p className="mt-4 text-[14px] font-light text-yacht-900/50">
-        Full details available on request — enquire and a broker will send the complete specification.
-      </p>
-    );
-  }
-
   return (
-    <>
-      {descriptionHtml && (
-        <div className="listing-prose mt-6" dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
-      )}
-      {sections.length > 0 && (
-        <div className="mt-8">
-          {sections.length > OPEN_BY_DEFAULT && (
-            <div className="mb-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setOpen(allOpen ? new Set() : new Set(sections.map((_, i) => i)))}
-                className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yacht-brand transition-colors hover:text-yacht-900"
-              >
-                {allOpen ? 'Collapse all' : 'Expand all'}
-              </button>
-            </div>
-          )}
-          <div className="border-t border-yacht-900/10">
-            {sections.map((s, i) => {
-              const isOpen = open.has(i);
-              const bodyId = `listing-section-${i}`;
-              return (
-                <section key={`${s.title}-${i}`} className="border-b border-yacht-900/10">
-                  <h3>
-                    <button
-                      type="button"
-                      onClick={() => toggle(i)}
-                      aria-expanded={isOpen}
-                      aria-controls={bodyId}
-                      className="flex w-full items-center justify-between gap-4 py-4 text-left text-[13px] font-semibold uppercase tracking-[0.2em] text-yacht-900 transition-colors hover:text-yacht-brand"
-                    >
-                      {s.title}
-                      <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-                    </button>
-                  </h3>
-                  {/* Collapsed sections stay in the document (hidden), so the
-                      full text is there for search engines that render the page. */}
-                  <div id={bodyId} hidden={!isOpen} className="listing-prose pb-6" dangerouslySetInnerHTML={{ __html: s.html }} />
-                </section>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </>
+    <section className="mt-12">
+      <div className="flex items-end justify-between gap-4">
+        <h2 className={heading}>Full Details</h2>
+        {sections.length > OPEN_BY_DEFAULT && (
+          <button
+            type="button"
+            onClick={() => setOpen(allOpen ? new Set() : new Set(sections.map((_, i) => i)))}
+            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yacht-brand transition-colors hover:text-yacht-900"
+          >
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
+        )}
+      </div>
+      <div className="mt-4 border-t border-yacht-900/10">
+        {sections.map((s, i) => {
+          const isOpen = open.has(i);
+          const bodyId = `listing-section-${i}`;
+          return (
+            <section key={`${s.title}-${i}`} className="border-b border-yacht-900/10">
+              <h3>
+                <button
+                  type="button"
+                  onClick={() => toggle(i)}
+                  aria-expanded={isOpen}
+                  aria-controls={bodyId}
+                  className="flex w-full items-center justify-between gap-4 py-4 text-left text-[13px] font-semibold uppercase tracking-[0.2em] text-yacht-900 transition-colors hover:text-yacht-brand"
+                >
+                  {s.title}
+                  <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+              </h3>
+              {/* Collapsed sections stay in the document (hidden), so the
+                  full text is there for search engines that render the page. */}
+              <div id={bodyId} hidden={!isOpen} className="listing-prose pb-6" dangerouslySetInnerHTML={{ __html: s.html }} />
+            </section>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
