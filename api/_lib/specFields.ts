@@ -249,7 +249,8 @@ function engineParts(e: Record<string, any>, each = false): (string | undefined)
   return [
     join([text(e.Make), text(e.Model)], ' '),
     hp && (each ? `${hp} each` : hp),
-    hours && `${fmtNum(hours.n, 0)} hrs`,
+    // Hours are only ever shown per engine (never a total): "595 hrs each" on a 2× row.
+    hours && `${fmtNum(hours.n, 0)} hrs${each ? ' each' : ''}`,
     count(e.Year) && String(e.Year),
     type,
     drive && !sameText(drive, type) && !/^other$/i.test(drive) ? drive : undefined,
@@ -356,7 +357,6 @@ export const SPEC_FIELDS: SpecField[] = [
   // Engines & Propulsion
   { group: 'Engines & Propulsion', label: 'Number of Engines', field: 'NumberOfEngines', compute: (it) => count(it.NumberOfEngines) ?? count(engines(it).length) },
   { group: 'Engines & Propulsion', label: 'Total Power', field: 'TotalEnginePowerQuantity', compute: totalPower },
-  { group: 'Engines & Propulsion', label: 'Total Hours', field: 'TotalEngineHoursNumeric', format: (v) => { const m = measure(v); return m ? `${fmtNum(m.n, 0)} hrs` : undefined; } },
   { group: 'Engines & Propulsion', label: 'Fuel Type', field: 'Engines', compute: fuelTypes },
   { group: 'Engines & Propulsion', label: 'Drive Type', field: 'DriveTypeCode', format: (v) => (/^other$/i.test(String(v ?? '').trim()) ? undefined : label(v)) },
   { group: 'Engines & Propulsion', label: 'Engines', field: 'Engines', compute: engineRows },
@@ -419,6 +419,8 @@ const HANDLED = new Set([
   'PlsDisclaimer', 'ListingType', 'SalesStatus', 'CompanyName', 'CoOpIndicator',
   // Deliberately not shown.
   'BoatHullID', 'StockNumber', 'Videos', 'EmbeddedVideo', 'ExternalLink',
+  // Never a total: engine hours are shown per engine, from Engines[].Hours (FYI, 2026-11-16).
+  'TotalEngineHoursNumeric',
 ]);
 const INTERNAL_RE = /(ID$|^Has|NoCaseAlnumOnly$|^Norm|TimeStamp$|Date$|DateTime$|Present$|^Service$|^Marketing$|^Owner$|^SalesRep$|^Office$|^Source$|Indicator$|^IsAvailable|^ProvisioningEventName$|Flag$)/;
 const MAPPED = new Set(SPEC_FIELDS.flatMap((f) => [f.field, ...(f.uses ?? [])]));

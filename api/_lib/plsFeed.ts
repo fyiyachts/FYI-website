@@ -31,7 +31,7 @@ export const PLS_FIELDS = [
   'LengthOverall', 'NominalLength', 'NormNominalLength', 'LengthOfDeck', 'LengthAtWaterLine',
   'BeamMeasure', 'MaxDraft', 'BridgeClearanceMeasure',
   'BoatLocation', 'BoatCategoryCode', 'BoatClassCode', 'SaleClassCode', 'BoatHullMaterialCode',
-  'Engines', 'NumberOfEngines', 'TotalEnginePowerQuantity', 'TotalEngineHoursNumeric', 'DriveTypeCode',
+  'Engines', 'NumberOfEngines', 'TotalEnginePowerQuantity', 'DriveTypeCode',
   'CruisingSpeedMeasure', 'MaximumSpeedMeasure', 'RangeMeasure',
   'FuelTankCapacityMeasure', 'WaterTankCapacityMeasure', 'HoldingTankCapacityMeasure',
   'CabinsCountNumeric', 'HeadsCountNumeric', 'MaximumNumberOfPassengersNumeric',
