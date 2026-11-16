@@ -53,6 +53,7 @@ function confirmPage(email: string, token: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
+<meta name="google-site-verification" content="HTLInLuHSBrfSbjRCjwkCNRwQrJZ3f5dIh6MwOK0PWQ" />
 <title>Unsubscribe — FYI Yachts</title>
 <style>
   body{margin:0;background:#eceae4;font-family:Georgia,serif;color:#0A192F;
