@@ -13,6 +13,7 @@ const FEED_CACHE_TTL_MS = 5 * 60 * 1000;
 const UPSTREAM_TIMEOUT_MS = 8000;
 
 import { formatMoney, listPrice } from './price.js';
+import { applyListingOverrides } from './listingOverrides.js';
 
 export interface InventoryBoat {
   id: string;
@@ -100,7 +101,7 @@ export async function fetchInventory(): Promise<InventoryBoat[]> {
     });
     if (!res.ok) throw new Error(`inventory feed failed (${res.status})`);
     const data: any = await res.json();
-    const items: any[] = Array.isArray(data?.results) ? data.results : [];
+    const items: any[] = Array.isArray(data?.results) ? data.results.map(applyListingOverrides) : [];
     const boats = items.map(normalize).filter((b) => b.id);
     // An empty upstream response is a feed hiccup, not a sold-out brokerage —
     // keep the last good catalogue rather than telling callers we have nothing.

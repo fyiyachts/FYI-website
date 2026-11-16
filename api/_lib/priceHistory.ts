@@ -20,6 +20,8 @@
 //
 // Every function no-ops (null / empty) when KV is not configured.
 
+import { manualReductions } from './listingOverrides.js';
+
 const KV_URL = (process.env.KV_REST_API_URL || '').replace(/\/$/, '');
 const KV_TOKEN = process.env.KV_REST_API_TOKEN || '';
 
@@ -135,12 +137,33 @@ const shardKey = (id: string): string => `price:hist:${Number(id.slice(-1)) % SH
 
 /** One boat's record. Null on a miss, an error, or with KV off — never throws. */
 export async function getPriceRecord(id: string): Promise<PriceRecord | null> {
-  if (!kvConfigured() || !/^\d+$/.test(id)) return null;
-  try {
-    return parse<PriceRecord>(await kv(['HGET', shardKey(id), id], 2_500));
-  } catch {
-    return null;
+  if (!/^\d+$/.test(id)) return null;
+  let rec: PriceRecord | null = null;
+  if (kvConfigured()) {
+    try {
+      rec = parse<PriceRecord>(await kv(['HGET', shardKey(id), id], 2_500));
+    } catch { /* fall through */ }
   }
+  return withManualReduction(id, rec);
+}
+
+/**
+ * A reduction entered by hand (api/_lib/listingOverrides.ts, while BoatWizard
+ * can't be edited) wins over the recorded history for that boat.
+ */
+function withManualReduction(id: string, rec: PriceRecord | null): PriceRecord | null {
+  const m = manualReductions()[id];
+  if (!m) return rec;
+  const dayBefore = new Date(Date.parse(m.date) - 864e5).toISOString().slice(0, 10);
+  return {
+    ...(rec || { type: 'e' as const }),
+    price: m.price,
+    currency: m.currency,
+    previousPrice: m.previous,
+    lastChanged: m.date,
+    firstSeen: rec?.firstSeen && rec.firstSeen < m.date ? rec.firstSeen : dayBefore,
+    gone: undefined,
+  };
 }
 
 /** The whole history, id → record (the cron's starting point). Throws on a KV error. */
@@ -170,21 +193,24 @@ export async function writePriceRecords(changed: Map<string, PriceRecord>, remov
 
 export interface ReducedIndex { updated: string; items: Record<string, Reduction> }
 
-/** Every boat currently showing "Price Reduced". Empty on any error. */
+/** Every boat currently showing "Price Reduced". Only the hand-entered ones on a KV error. */
 export async function getReducedIndex(): Promise<ReducedIndex> {
-  const empty: ReducedIndex = { updated: '', items: {} };
-  if (!kvConfigured()) return empty;
-  try {
-    const idx = await kvGetJson<ReducedIndex>('price:reduced');
-    if (!idx || typeof idx.items !== 'object') return empty;
-    // The cron prunes daily; this also holds if it misses a day.
-    const cutoff = daysAgo(REDUCED_WINDOW_DAYS);
-    const items: Record<string, Reduction> = {};
-    for (const [id, r] of Object.entries(idx.items)) if (r && r.date >= cutoff) items[id] = r;
-    return { updated: idx.updated || '', items };
-  } catch {
-    return empty;
+  // The cron prunes daily; this also holds if it misses a day.
+  const cutoff = daysAgo(REDUCED_WINDOW_DAYS);
+  const items: Record<string, Reduction> = {};
+  let updated = '';
+  if (kvConfigured()) {
+    try {
+      const idx = await kvGetJson<ReducedIndex>('price:reduced');
+      if (idx && typeof idx.items === 'object') {
+        updated = idx.updated || '';
+        for (const [id, r] of Object.entries(idx.items)) if (r && r.date >= cutoff) items[id] = r;
+      }
+    } catch { /* recorded history unavailable */ }
   }
+  // Reductions entered by hand (api/_lib/listingOverrides.ts) win.
+  for (const [id, r] of Object.entries(manualReductions())) if (r.date >= cutoff) items[id] = r;
+  return { updated, items };
 }
 
 /** Card rows (feed-shaped) for the "Price reduced" filter. Empty on any error. */

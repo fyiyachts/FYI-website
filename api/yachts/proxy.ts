@@ -9,7 +9,7 @@ type VercelResponse = {
 
 import { findManualListing, manualListingsFor } from '../_lib/manualListings.js';
 import { plsConfigured, plsGetById } from '../_lib/plsFeed.js';
-import { hideListingPhotos, hideListingPhotosInBody } from '../_lib/hiddenListingPhotos.js';
+import { applyListingOverrides, applyListingOverridesInBody } from '../_lib/listingOverrides.js';
 
 // BoatsGroup (boats.com) inventory feed. Key is a query param (no auth header).
 // Set BOATS_API_KEY to FYI's own BoatsGroup inventory key.
@@ -242,8 +242,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       } catch { /* not JSON — pass through untouched */ }
     }
-    // Photos taken off specific listings on the site (api/_lib/hiddenListingPhotos.ts).
-    if (upstream.ok) body = hideListingPhotosInBody(body);
+    // Manual listing fixes: hidden photos, price overrides (api/_lib/listingOverrides.ts).
+    if (upstream.ok) body = applyListingOverridesInBody(body);
     // The catalogue changes a few times a day, and the same handful of queries
     // (rows=400, salesstatus=sold) repeat constantly. Letting the CDN answer
     // those keeps both the lambda and the upstream out of the hot path — most
@@ -319,7 +319,7 @@ async function listingLookup(res: VercelResponse, url: URL, timeoutMs: number, r
   }
   if (found) {
     res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
-    return res.status(200).send(hideListingPhotosInBody(upstream.body));
+    return res.status(200).send(applyListingOverridesInBody(upstream.body));
   }
 
   // Not one of FYI's boats? It may be a co-brokerage listing (BoatsGroup
@@ -331,7 +331,7 @@ async function listingLookup(res: VercelResponse, url: URL, timeoutMs: number, r
       const co = await withRetry(() => plsGetById(id), () => false, retry);
       if (co) {
         res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
-        return res.status(200).json({ numResults: 1, results: [hideListingPhotos(co)] });
+        return res.status(200).json({ numResults: 1, results: [applyListingOverrides(co)] });
       }
     } catch (err: any) {
       return fail(502, `PLS: ${err?.message || err}`);

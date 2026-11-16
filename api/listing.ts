@@ -19,7 +19,7 @@
 import { INDEX_SHELL } from './_lib/indexShell.js';
 import { findManualListing } from './_lib/manualListings.js';
 import { plsGetById } from './_lib/plsFeed.js';
-import { hideListingPhotos } from './_lib/hiddenListingPhotos.js';
+import { applyListingOverrides } from './_lib/listingOverrides.js';
 import { buildListingContent } from './_lib/listingContent.js';
 import { buildSpecGroups, fmtDate, type SpecGroupRows } from './_lib/specFields.js';
 import { buildListingSeo, listingJsonLd } from './_lib/listingSeo.js';
@@ -200,7 +200,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // A PLS error throws to the 503 path; only a clean miss is "gone".
     if (!it) it = await plsGetById(id);
     if (!it) return await gone(res, id);
-    hideListingPhotos(it); // photos taken off this listing on the site, if any
+    applyListingOverrides(it); // manual fixes (hidden photos, price override), if any
 
     const cobrokerage = it.ListingType === 'cobrokerage';
     const content = buildListingContent(it);

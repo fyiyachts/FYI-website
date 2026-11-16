@@ -10,6 +10,7 @@ import { MANUAL_LISTINGS } from './manualListings.js';
 import { plsConfigured, plsSearch, PLS_CARD_FIELDS } from './plsFeed.js';
 import { formatMoney, listPrice } from './price.js';
 import { listingLocation } from './specFields.js';
+import { applyListingOverrides } from './listingOverrides.js';
 
 const INVENTORY_URL = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -63,7 +64,7 @@ async function fyiActive(): Promise<Record<string, any>[]> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data: any = await res.json();
     const rows = (Array.isArray(data?.results) ? data.results : []).map((r: Record<string, any>) => ({
-      ...r, Images: Array.isArray(r.Images) ? r.Images.slice(0, 1) : [],
+      ...applyListingOverrides(r), Images: Array.isArray(r.Images) ? r.Images.slice(0, 1) : [],
     }));
     fyiCache = { rows: [...MANUAL_LISTINGS, ...rows], at: Date.now() };
     return fyiCache.rows;
