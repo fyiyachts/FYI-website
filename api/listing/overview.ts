@@ -4,6 +4,7 @@
 // OPENAI_API_KEY that powers Brianna; per-instance cache keeps repeat
 // views free. Silently 404s when the key is absent so the UI hides.
 import OpenAI from 'openai';
+import { applyListingOverrides } from '../_lib/listingOverrides.js';
 
 type VercelRequest = { query: Record<string, string | string[]>; method?: string };
 type VercelResponse = {
@@ -42,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     url.searchParams.set('key', KEY);
     url.searchParams.set('documentid', id);
     const feed = await fetch(url).then((r) => r.json()) as { results?: Record<string, unknown>[] };
-    const it = feed.results?.[0] as Record<string, any> | undefined;
+    const it = feed.results?.[0] ? applyListingOverrides(feed.results[0] as Record<string, any>) : undefined;
     if (!it) return res.status(404).json({ error: 'listing not found' });
 
     const loc = it.BoatLocation || {};

@@ -5,6 +5,7 @@
 // pagination gotcha logged in the brain, 2026-07-15).
 
 import { listPrice, type Money } from './price.js';
+import { applyListingOverrides } from './listingOverrides.js';
 
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -95,7 +96,7 @@ export async function fetchFleet(): Promise<FleetBoat[]> {
     const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error(`fleet feed failed (${res.status})`);
     const data: any = await res.json();
-    const items: any[] = Array.isArray(data?.results) ? data.results : [];
+    const items: any[] = Array.isArray(data?.results) ? data.results.map(applyListingOverrides) : [];
     let added = 0;
     for (const it of items) {
       const b = normalizeFleetItem(it);

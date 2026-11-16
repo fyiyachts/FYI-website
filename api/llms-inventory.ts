@@ -15,6 +15,7 @@ type VercelResponse = {
 import { MANUAL_LISTINGS } from './_lib/manualListings.js';
 import { countryName } from './_lib/countryName.js';
 import { formatMoney, listPrice } from './_lib/price.js';
+import { applyListingOverrides } from './_lib/listingOverrides.js';
 
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -74,7 +75,7 @@ async function fyiBook(): Promise<Record<string, any>[]> {
   });
   if (!res.ok) throw new Error(`boats.com ${res.status}`);
   const body = (await res.json()) as { results?: Record<string, any>[] };
-  return body.results ?? [];
+  return (body.results ?? []).map(applyListingOverrides);
 }
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {

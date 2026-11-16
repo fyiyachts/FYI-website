@@ -1,3 +1,5 @@
+import { applyListingOverrides } from '../_lib/listingOverrides.js';
+
 // FYI's BoatsGroup (boats.com) inventory feed — same source as /api/yachts/proxy.
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const BOATS_KEY = process.env.BOATS_API_KEY || '';
@@ -19,7 +21,7 @@ export default async function handler(req: any, res: any) {
       return res.status(404).json({ error: 'Yacht not found' });
     }
 
-    const item = items[0];
+    const item = applyListingOverrides(items[0]);
     let imageUrl = '';
     if (item.Images && Array.isArray(item.Images) && item.Images.length > 0) {
       const firstImg = item.Images[0];
