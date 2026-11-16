@@ -85,7 +85,7 @@ export function reductionOf(rec: PriceRecord | null | undefined, now = today()):
 
 /* ------------------------------------------------ Upstash REST */
 
-async function kv(command: (string | number)[], timeoutMs = 4_000): Promise<any> {
+export async function kv(command: (string | number)[], timeoutMs = 4_000): Promise<any> {
   if (!kvConfigured()) return null;
   const res = await fetch(KV_URL, {
     method: 'POST',
@@ -99,7 +99,7 @@ async function kv(command: (string | number)[], timeoutMs = 4_000): Promise<any>
   return data.result ?? null;
 }
 
-async function kvPipeline(commands: (string | number)[][], timeoutMs = 15_000): Promise<void> {
+export async function kvPipeline(commands: (string | number)[][], timeoutMs = 15_000): Promise<void> {
   if (!kvConfigured() || !commands.length) return;
   const res = await fetch(`${KV_URL}/pipeline`, {
     method: 'POST',
