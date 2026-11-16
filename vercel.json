@@ -328,6 +328,10 @@
     {
       "path": "/api/cron/seo-sync",
       "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron/indexnow",
+      "schedule": "10 * * * *"
     }
   ],
   "trailingSlash": false,

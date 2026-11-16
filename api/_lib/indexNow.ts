@@ -7,13 +7,15 @@
 // is the Search Console sitemap in api/admin/seo.ts.
 //
 // Ownership is proved by hosting <key>.txt at the site root containing the
-// key. scripts/prerender.mjs writes that file at build time from the same
-// INDEXNOW_KEY (same committed default), so the key and the file cannot drift.
+// key: public/<key>.txt, a committed file whose name and contents are the KEY
+// below. To rotate: generate a new 32-hex key, rename that file, put the key
+// in it, and change KEY here — in one commit, so the pair cannot drift. The
+// old key stops verifying once its file is gone (rotated 2026-11-16).
 // The key is public by design — it authenticates the site, not the account.
 
 const ENDPOINT = 'https://api.indexnow.org/IndexNow';
 const SITE = (process.env.SITE_URL || 'https://fyiyachts.com').replace(/\/$/, '');
-const KEY = process.env.INDEXNOW_KEY || 'f358d775e5f54fdd912174feb9436017';
+const KEY = '6063bd0f927ec5692c38c8ce78e39d62';
 
 /** One submission may carry at most 10,000 URLs. */
 const MAX_URLS = 10_000;
@@ -82,16 +84,16 @@ export async function submitToIndexNow(urls: string[]): Promise<IndexNowResult> 
 /**
  * Verify the key file is actually reachable before blaming IndexNow for a
  * 403. Cheap, and the single most common reason submissions silently stop
- * working (a deploy that drops the file, or a rotated INDEXNOW_KEY whose
+ * working (a deploy that drops the file, or a rotated key whose
  * build hasn't shipped yet).
  */
 export async function verifyIndexNowKeyFile(): Promise<{ ok: boolean; url: string; detail: string }> {
   const url = indexNowKeyUrl();
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-    if (!res.ok) return { ok: false, url, detail: `Key file returned ${res.status}. Redeploy so the build writes it.` };
+    if (!res.ok) return { ok: false, url, detail: `Key file returned ${res.status}. public/<key>.txt is missing from the deploy.` };
     const body = (await res.text()).trim();
-    if (body !== KEY) return { ok: false, url, detail: 'Key file contents do not match INDEXNOW_KEY.' };
+    if (body !== KEY) return { ok: false, url, detail: 'Key file contents do not match the key in api/_lib/indexNow.ts.' };
     return { ok: true, url, detail: 'Key file present and matching.' };
   } catch (err: any) {
     return { ok: false, url, detail: `Key file unreachable: ${err?.message || err}` };
