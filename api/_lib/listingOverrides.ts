@@ -54,7 +54,7 @@ interface PriceOverride {
 
 /** DocumentID → price override. USD listings only. */
 const PRICES: Record<string, PriceOverride> = {
-  '10354522': { price: 2_500_000, was: 2_695_000, since: '2026-11-16' }, // 2020 Azimut S8
+  '10354522': { price: 2_595_000, was: 2_695_000, since: '2026-11-16' }, // 2020 Azimut S8
 };
 
 /* ------------------------------------------------ applying */

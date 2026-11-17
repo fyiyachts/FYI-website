@@ -213,12 +213,28 @@ export async function getReducedIndex(): Promise<ReducedIndex> {
   return { updated, items };
 }
 
+/** The portal's Price Drops entries, with hand-entered reductions' current prices. */
+export function withManualDrops(drops: unknown[]): unknown[] {
+  const manual = manualReductions();
+  return drops.map((d: any) => {
+    const m = d && manual[String(d.id)];
+    return m ? { ...d, oldPrice: m.previous, newPrice: m.price, pct: m.pct } : d;
+  });
+}
+
 /** Card rows (feed-shaped) for the "Price reduced" filter. Empty on any error. */
 export async function getReducedCards(): Promise<Record<string, any>[]> {
   if (!kvConfigured()) return [];
   try {
     const cards = await kvGetJson<Record<string, any>[]>('price:reduced:cards');
-    return Array.isArray(cards) ? cards : [];
+    if (!Array.isArray(cards)) return [];
+    // A hand-entered price (api/_lib/listingOverrides.ts) wins over the saved card's.
+    const manual = manualReductions();
+    for (const c of cards) {
+      const m = manual[String(c?.DocumentID)];
+      if (m) { c.Price = `${m.price.toFixed(2)} ${m.currency}`; c.NormPrice = m.price; }
+    }
+    return cards;
   } catch {
     return [];
   }
