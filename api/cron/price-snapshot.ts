@@ -21,7 +21,7 @@ import {
   getAllPriceRecords, kvConfigured, kvGetJson, kvSetJson, reductionOf, writePriceRecords,
   REDUCED_WINDOW_DAYS, type PriceRecord, type Reduction,
 } from '../_lib/priceHistory.js';
-import { applyListingOverrides } from '../_lib/listingOverrides.js';
+import { applyListingOverrides, manualReductions } from '../_lib/listingOverrides.js';
 
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -130,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const removed: string[] = [];
     const reduced: Record<string, Reduction> = {};
     const newlyReduced: string[] = [];
+    const manual_ = manualReductions();
 
     for (const [id, { it, type }] of todayRows) {
       const shown = listPrice(it); // undefined when hidden or absent
@@ -172,6 +173,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         rec.lastChanged = nowIso;
       }
       if (!shown) delete rec.previousPrice; // hidden price: never a "was"
+      // A reduction entered by hand (api/_lib/listingOverrides.ts) is this
+      // boat's history while it is shown: correcting the override's price
+      // must not read as a price change.
+      const manual = manual_[id];
+      if (manual && shown && shown.currency === manual.currency && shown.amount === manual.price) {
+        rec.previousPrice = manual.previous;
+        rec.lastChanged = manual.date;
+      }
 
       if (!prev || JSON.stringify(prev) !== JSON.stringify(rec)) changed.set(id, rec);
       const r = reductionOf(rec, nowIso);

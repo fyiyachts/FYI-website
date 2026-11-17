@@ -9,7 +9,7 @@
 //                  Reduced" window: cards and listing pages badge from this
 //   GET /api/yachts/price-drops?cards=1  → { numResults, results, reduced }
 //        feed-shaped card rows for the "Price reduced" filter on /yachts-for-sale
-import { getReducedCards, getReducedIndex, kvConfigured, kvGetJson } from '../_lib/priceHistory.js';
+import { getReducedCards, getReducedIndex, kvConfigured, kvGetJson, withManualDrops } from '../_lib/priceHistory.js';
 
 type VercelRequest = { method?: string; query?: Record<string, string | string[]> };
 type VercelResponse = {
@@ -37,5 +37,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ numResults: results.length, results, reduced: index.items, configured: true });
   }
   const drops = await kvGetJson<unknown[]>('price:drops').catch(() => null);
-  return res.status(200).json({ drops: Array.isArray(drops) ? drops : [], reduced: index.items, configured: true });
+  return res.status(200).json({ drops: Array.isArray(drops) ? withManualDrops(drops) : [], reduced: index.items, configured: true });
 }
