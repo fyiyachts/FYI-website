@@ -134,6 +134,7 @@ function normalize(it: any): Boat {
 // Moved to GalleryPieces.tsx so the eager public bundle (CharterPages) can
 // use them without pulling this whole page in; re-exported for compatibility.
 import { SpecSection, Lightbox, isGalleryVideo, youtubeThumb, type GalleryEntry } from './GalleryPieces';
+import { ListingVideos } from './ListingVideos';
 export { SpecSection, Lightbox };
 
 function EnquireModal({ boat, onClose }: { boat: Boat; onClose: () => void }) {
@@ -446,13 +447,25 @@ export default function PublicListingPage() {
                 className="max-h-[70vh] min-h-[320px] w-full object-cover lg:aspect-[16/8]"
               />
             </button>
-            <button
-              type="button"
-              onClick={() => setLightbox(0)}
-              className="absolute bottom-4 left-4 flex items-center gap-2 bg-white/95 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-yacht-900 shadow-sm transition-colors hover:bg-yacht-brand hover:text-white"
-            >
-              <Camera className="h-4 w-4" /> View Photos ({boat.images.length}){boat.videos.length ? ` & Video${boat.videos.length > 1 ? 's' : ''}` : ''}
-            </button>
+            <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setLightbox(0)}
+                className="flex items-center gap-2 bg-white/95 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-yacht-900 shadow-sm transition-colors hover:bg-yacht-brand hover:text-white"
+              >
+                <Camera className="h-4 w-4" /> View Photos ({boat.images.length})
+              </button>
+              {boat.videos.length > 0 && (
+                // The first video is the gallery's second item, right after the main photo.
+                <button
+                  type="button"
+                  onClick={() => setLightbox(1)}
+                  className="flex items-center gap-2 bg-white/95 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-yacht-900 shadow-sm transition-colors hover:bg-yacht-brand hover:text-white"
+                >
+                  <Play className="h-4 w-4 fill-current" /> <span className="sm:hidden">Video</span><span className="hidden sm:inline">Watch Video</span>
+                </button>
+              )}
+            </div>
           </div>
           {gallery.length > 1 && (
             <div className="mt-2 grid grid-cols-4 gap-2 lg:grid-cols-6">
@@ -494,6 +507,9 @@ export default function PublicListingPage() {
               <ListingDescription content={boat.content} />
             </div>
           </section>
+
+          {/* The exclusive's YouTube videos (api/_lib/listingVideos.ts). */}
+          <ListingVideos videos={boat.videos} boatTitle={boat.title} />
 
           {/* Order (client, 2026-11-13): description, specifications, then the
               longer detail sections as drop-downs. api/listing.ts matches. */}

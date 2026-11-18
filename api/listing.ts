@@ -20,6 +20,7 @@ import { INDEX_SHELL } from './_lib/indexShell.js';
 import { findManualListing } from './_lib/manualListings.js';
 import { plsGetById } from './_lib/plsFeed.js';
 import { applyListingOverrides } from './_lib/listingOverrides.js';
+import { attachListingVideos, type ListingVideo } from './_lib/listingVideos.js';
 import { buildListingContent } from './_lib/listingContent.js';
 import { buildSpecGroups, fmtDate, type SpecGroupRows } from './_lib/specFields.js';
 import { buildListingSeo, listingJsonLd } from './_lib/listingSeo.js';
@@ -201,6 +202,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!it) it = await plsGetById(id);
     if (!it) return await gone(res, id);
     applyListingOverrides(it); // manual fixes (hidden photos, price override), if any
+    await attachListingVideos(it); // watchable YouTube videos (exclusives), as on the React page
+    const videos: ListingVideo[] = Array.isArray(it.FyiVideos) ? it.FyiVideos : [];
 
     const cobrokerage = it.ListingType === 'cobrokerage';
     const content = buildListingContent(it);
@@ -282,6 +285,8 @@ ${content.descriptionHtml
     ? `<div class="listing-prose mt-5">${content.descriptionHtml}</div>`
     : content.sections.length ? '' : '<p class="mt-4 text-[14px] font-light text-yacht-900/50">Full details available on request \u2014 enquire and a broker will send the complete specification.</p>'}
 </section>
+${videos.length ? `<section class="mt-12"><h2 class="font-serif text-2xl italic tracking-wide text-yacht-900">${videos.length > 1 ? 'Videos' : 'Video'}</h2>
+<ul class="mt-5 grid gap-3">${videos.map((v) => `<li><a class="text-[15px] font-light text-yacht-900 underline" href="https://www.youtube.com/watch?v=${esc(v.id)}">${esc(v.title || `${seo.h1 ?? 'Yacht'} — video tour`)}</a></li>`).join('')}</ul></section>` : ''}
 ${specsHtml(groups)}
 ${content.sections.length ? `<section class="mt-12"><h2 class="font-serif text-2xl italic tracking-wide text-yacht-900">Full Details</h2>
 ${content.sections.map((s) => `<section class="mt-6 border-t border-yacht-900/10 pt-6"><h3 class="text-[13px] font-semibold uppercase tracking-[0.2em] text-yacht-900">${esc(s.title)}</h3><div class="listing-prose mt-3">${s.html}</div></section>`).join('\n')}</section>` : ''}
