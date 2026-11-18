@@ -112,7 +112,10 @@ function normalize(it: any): Boat {
     condition: it.SaleClassCode || undefined,
     location: [loc.BoatCityName && loc.BoatCityName !== 'Unknown' ? loc.BoatCityName : null, loc.BoatStateCode || countryName(loc.BoatCountryID)]
       .filter(Boolean).join(', ') || undefined,
-    images: images.slice(0, 30),
+    // Every photo the feed has. The gallery loads one at a time (lightbox) and
+    // the page itself shows only the hero and six thumbnails, so a 200-photo
+    // listing costs no more to load than a 30-photo one.
+    images,
     description: content.descriptionText || undefined,
     content,
     raw: it,
