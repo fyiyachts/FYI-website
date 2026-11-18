@@ -27,7 +27,15 @@ export function SpecSection({ heading, rows }: { heading: string; rows: [string,
   );
 }
 
-export function Lightbox({ images, title, start, onClose }: { images: string[]; title: string; start: number; onClose: () => void }) {
+/** A YouTube video in a gallery (listing pages: right after the main photo). */
+export interface GalleryVideo { youtube: string; title?: string }
+/** A gallery entry: a photo URL, or a YouTube video. */
+export type GalleryEntry = string | GalleryVideo;
+export const isGalleryVideo = (e: GalleryEntry): e is GalleryVideo => typeof e !== 'string';
+/** YouTube's own still for a video (480×360). */
+export const youtubeThumb = (id: string): string => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+
+export function Lightbox({ images, title, start, onClose }: { images: GalleryEntry[]; title: string; start: number; onClose: () => void }) {
   const [i, setI] = useState(start);
   const touchX = useRef<number | null>(null);
   useLockBodyScroll(true);
@@ -69,8 +77,27 @@ export function Lightbox({ images, title, start, onClose }: { images: string[]; 
           the overflow can't be scrolled to. Portrait shots on a 16:9 screen
           lost ~1500px off the bottom, arrows included. */}
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {/* Full view: ~1800px is sharp on a large screen without pulling the original. */}
-        <img src={optImg(images[i], 1800)} alt={`${title} — photo ${i + 1}`} className="max-h-full max-w-full select-none object-contain" />
+        {(() => {
+          const entry = images[i];
+          if (isGalleryVideo(entry)) {
+            // Privacy-enhanced embed; it only loads while this slide is open.
+            return (
+              <div className="aspect-video w-full max-w-5xl max-h-full">
+                <iframe
+                  key={entry.youtube}
+                  src={`https://www.youtube-nocookie.com/embed/${entry.youtube}?rel=0&playsinline=1&modestbranding=1`}
+                  title={entry.title || `${title} — video`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  className="h-full w-full border-0"
+                />
+              </div>
+            );
+          }
+          // Full view: ~1800px is sharp on a large screen without pulling the original.
+          return <img src={optImg(entry, 1800)} alt={`${title} — photo ${i + 1}`} className="max-h-full max-w-full select-none object-contain" />;
+        })()}
         {images.length > 1 && (
           <>
             <button type="button" aria-label="Previous photo" onClick={() => setI((n) => (n - 1 + images.length) % images.length)}

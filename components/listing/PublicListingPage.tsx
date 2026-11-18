@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Anchor, Camera, ChevronLeft, ChevronRight, Loader2, Share2, X } from 'lucide-react';
+import { Anchor, Camera, ChevronLeft, ChevronRight, Loader2, Play, Share2, X } from 'lucide-react';
 import { FinanceCalculator, InsuranceQuoteCta } from './BuyerTools';
 import { ListingDescription, ListingDisclaimer, ListingSections, SpecGroups } from './ListingDetails';
 import { buildSpecGroups, fmtDate, unmappedFields } from './specFields';
@@ -60,6 +60,8 @@ interface Boat {
   condition?: string;
   location?: string;
   images: string[];
+  /** Watchable YouTube videos (exclusives; api/_lib/listingVideos.ts). Shown right after the main photo. */
+  videos: { id: string; title?: string }[];
   /** Plain-text description (insurance / JSON-LD); the page renders `content`. */
   description?: string;
   /** Cleaned description, detail sections, feed disclaimer and ListingTitle tag. */
@@ -116,6 +118,10 @@ function normalize(it: any): Boat {
     // the page itself shows only the hero and six thumbnails, so a 200-photo
     // listing costs no more to load than a 30-photo one.
     images,
+    videos: Array.isArray(it.FyiVideos)
+      ? it.FyiVideos.filter((v: any) => typeof v?.id === 'string' && /^[A-Za-z0-9_-]{11}$/.test(v.id))
+        .map((v: any) => ({ id: v.id, ...(typeof v.title === 'string' ? { title: v.title } : {}) }))
+      : [],
     description: content.descriptionText || undefined,
     content,
     raw: it,
@@ -127,7 +133,7 @@ function normalize(it: any): Boat {
 
 // Moved to GalleryPieces.tsx so the eager public bundle (CharterPages) can
 // use them without pulling this whole page in; re-exported for compatibility.
-import { SpecSection, Lightbox } from './GalleryPieces';
+import { SpecSection, Lightbox, isGalleryVideo, youtubeThumb, type GalleryEntry } from './GalleryPieces';
 export { SpecSection, Lightbox };
 
 function EnquireModal({ boat, onClose }: { boat: Boat; onClose: () => void }) {
@@ -392,7 +398,11 @@ export default function PublicListingPage() {
   }
   if (state === 'gone' || !boat) return <GoneListing id={id} />;
 
-  const gallery = boat.images;
+  // Main photo first, then the listing's videos, then the other photos.
+  const gallery: GalleryEntry[] = boat.images.length
+    ? [boat.images[0], ...boat.videos.map((v) => ({ youtube: v.id, title: v.title })), ...boat.images.slice(1)]
+    : [];
+  const hero = boat.images[0];
   const metric = boat.lengthFt ? `${Math.round(boat.lengthFt)}'/${(boat.lengthFt * 0.3048).toFixed(1)}m` : undefined;
   const displayModel = boat.model || boat.title;
 
@@ -425,8 +435,8 @@ export default function PublicListingPage() {
                   api/listing.ts preloads this same src/srcset — keep the two in
                   step (HERO_WIDTHS / HERO_SIZES). */}
               <img
-                src={optImg(gallery[0], 1280)}
-                srcSet={srcSet(gallery[0], HERO_WIDTHS)}
+                src={optImg(hero, 1280)}
+                srcSet={srcSet(hero, HERO_WIDTHS)}
                 sizes={HERO_SIZES}
                 width={1280}
                 height={960}
@@ -441,22 +451,33 @@ export default function PublicListingPage() {
               onClick={() => setLightbox(0)}
               className="absolute bottom-4 left-4 flex items-center gap-2 bg-white/95 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-yacht-900 shadow-sm transition-colors hover:bg-yacht-brand hover:text-white"
             >
-              <Camera className="h-4 w-4" /> View Photos ({gallery.length})
+              <Camera className="h-4 w-4" /> View Photos ({boat.images.length}){boat.videos.length ? ` & Video${boat.videos.length > 1 ? 's' : ''}` : ''}
             </button>
           </div>
           {gallery.length > 1 && (
             <div className="mt-2 grid grid-cols-4 gap-2 lg:grid-cols-6">
-              {gallery.slice(1, 7).map((src, idx) => (
-                <button key={src + idx} type="button" onClick={() => setLightbox(idx + 1)} aria-label={`Photo ${idx + 2}`}
+              {gallery.slice(1, 7).map((entry, idx) => {
+                const video = isGalleryVideo(entry);
+                return (
+                <button key={(video ? entry.youtube : entry) + idx} type="button" onClick={() => setLightbox(idx + 1)}
+                  aria-label={video ? `Play video${entry.title ? `: ${entry.title}` : ''}` : `Photo ${idx + 2}`}
                   className="group relative overflow-hidden">
-                  <img src={optImg(src, 320)} alt="" width={320} height={240} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={video ? youtubeThumb(entry.youtube) : optImg(entry, 320)} alt="" width={320} height={240} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  {video && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-yacht-900/25 transition-colors group-hover:bg-yacht-900/10">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-yacht-900 shadow-md transition-colors group-hover:bg-yacht-brand group-hover:text-white">
+                        <Play className="ml-0.5 h-5 w-5 fill-current" />
+                      </span>
+                    </span>
+                  )}
                   {idx === 5 && gallery.length > 7 && (
                     <span className="absolute inset-0 flex items-center justify-center bg-yacht-900/60 text-[13px] font-semibold tracking-widest text-white">
                       +{gallery.length - 7}
                     </span>
                   )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
