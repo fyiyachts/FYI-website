@@ -10,6 +10,7 @@ type VercelResponse = {
 import { findManualListing, manualListingsFor } from '../_lib/manualListings.js';
 import { plsConfigured, plsGetById } from '../_lib/plsFeed.js';
 import { applyListingOverrides, applyListingOverridesInBody } from '../_lib/listingOverrides.js';
+import { attachListingVideos } from '../_lib/listingVideos.js';
 
 // BoatsGroup (boats.com) inventory feed. Key is a query param (no auth header).
 // Set BOATS_API_KEY to FYI's own BoatsGroup inventory key.
@@ -319,7 +320,18 @@ async function listingLookup(res: VercelResponse, url: URL, timeoutMs: number, r
   }
   if (found) {
     res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
-    return res.status(200).send(applyListingOverridesInBody(upstream.body));
+    let body = applyListingOverridesInBody(upstream.body);
+    // Watchable YouTube videos for the gallery (api/_lib/listingVideos.ts).
+    if (/youtu/i.test(body)) {
+      try {
+        const data = JSON.parse(body);
+        if (Array.isArray(data?.results)) {
+          await Promise.all(data.results.map((r: Record<string, any>) => attachListingVideos(r)));
+          body = JSON.stringify(data);
+        }
+      } catch { /* not JSON — pass through */ }
+    }
+    return res.status(200).send(body);
   }
 
   // Not one of FYI's boats? It may be a co-brokerage listing (BoatsGroup
