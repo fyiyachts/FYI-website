@@ -1,6 +1,7 @@
 // Hand-entered sale listings that are NOT in FYI's BoatsGroup feed (client,
 // 2026-10-01 — central-agency boats FYI is marketing from the brokers' own
-// brochures; ANIM and the Alium 42 added 2026-10-28). Each record is shaped like a raw boats.com feed item so
+// brochures; ANIM and the Alium 42 added 2026-10-28; the Maiora 97 on
+// 2026-11-19, from FYI's own YachtWay listing while BoatWizard is unavailable). Each record is shaped like a raw boats.com feed item so
 // every consumer that already parses the feed (the /api/yachts/proxy grids,
 // search, the listing page, /api/listing's server render) handles it with no
 // extra code. DocumentIDs sit in the 99,000,000 range, far above anything
@@ -200,6 +201,62 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     GeneralBoatDescription:
       'Asking €845,000 ex VAT (list price €981,070 ex VAT, fully equipped) — special offer, available now in Cannes. 2027 model year at 2026 prices, 2-year warranty. Private sea trials by appointment. The Alium 42 T-Top is an aluminium-hulled 42′ T-top designed by Valentin Design, shown here in the Two-Tone Grey Edition with a metallic grey finish. She tops out at 41 knots and burns about 85 L/h at 26 knots. Opening side wings create a 26 m² terrace on the water, and internal lifting points are engineered for superyacht tender operations. Key data — LOA 12.70 m · Beam 3.98 m · 10 t · 2 × Volvo Penta D6-440 DPI, 880 hp total · Max 41 kn · Range 340 nm · Fuel 1,200 L · Water 2 × 150 L Accommodation — Cabin with convertible double berth and bathroom Equipment — T-top and forward sunpad · Fold-down side wings · Flexiteek decking · 7.2 kWh lithium service batteries · Ice maker, gas grill, cabin electric hob · Garmin 16″ GPS · Fusion premium audio · Bow thruster · Telescopic anchor system · Bimini extension · Full winter cover Aluminium construction — Strength and durability · Light and fast · Impact resistant · Repairable · Recyclable · Reduced vibration · No osmosis. Particulars given in good faith but not guaranteed.',
     Images: imgs('alium-42', 8, '2027 Alium 42 T-Top'),
+  },
+  {
+    // Source: FYI's own YachtWay listing (client, 2026-11-19 — not in
+    // BoatWizard while it is inaccessible): https://yachtway.com/brands/
+    // maiora-yachts-for-sale/97-raised-pilothouse/2012-97-raised-pilothouse-kc2z0y5e/
+    // All 120 gallery photos, in YachtWay's order. Left out on the client's
+    // call: YachtWay's engine hours (1 per engine, a placeholder) and its
+    // "PRELIMINARY LISTING" line; guests 10, as its description says (its spec
+    // box says 3). Its hull number is a placeholder and is not used. Beam and
+    // draft are YachtWay's spec values; its description's 6.45 m / 2.05 m
+    // disagree with them and were left out of the description.
+    Source: 'FYI-MANUAL',
+    DocumentID: '99000005',
+    SalesStatus: 'Active',
+    CompanyName: 'FYI Yachts',
+    Office: OFFICE,
+    LastModificationDate: '2026-11-19',
+    ItemReceivedDate: '2026-11-19',
+    Price: '3499000 USD',
+    NormPrice: 3499000,
+    PriceHideInd: false,
+    BoatLocation: { BoatCityName: 'Aventura', BoatStateCode: 'FL', BoatCountryID: 'US' },
+    MakeString: 'Maiora',
+    ModelYear: 2012,
+    SaleClassCode: 'Used',
+    Model: "97' Raised Pilothouse",
+    BoatCategoryCode: 'Power',
+    BuilderName: 'Maiora Design & Construction',
+    DesignerName: 'Francesco Paszkowski Design, Roberto Del Re',
+    MaximumSpeedMeasure: '25 kn',
+    BeamMeasure: '20.9 ft',
+    MaxDraft: '5.6 ft',
+    DryWeightMeasure: '198,000 lb',
+    FuelTankCapacityMeasure: '1849|gallon',
+    FuelTankCountNumeric: 4,
+    FuelTankMaterialCode: 'Aluminum',
+    WaterTankCapacityMeasure: '660|gallon',
+    NumberOfEngines: 2,
+    TotalEnginePowerQuantity: '3,900 hp',
+    DriveTypeCode: 'Shaft Drive',
+    BoatHullMaterialCode: 'Fiberglass',
+    CabinsCountNumeric: 4,
+    HeadsCountNumeric: 5, // 4 en-suite heads + a day head (YachtWay: 4.5)
+    BerthsCountNumeric: 8, // 2 double beds + 4 single (YachtWay's total)
+    MaximumNumberOfPassengersNumeric: 10,
+    NominalLength: '97 ft',
+    LengthOverall: '97 ft',
+    Engines: [
+      { Make: 'MTU', Model: '12V 2000 M94', Fuel: 'diesel', EnginePower: '1950|horsepower', Type: 'Inboard', BoatEngineLocationCode: 'Port' },
+      { Make: 'MTU', Model: '12V 2000 M94', Fuel: 'diesel', EnginePower: '1950|horsepower', Type: 'Inboard', BoatEngineLocationCode: 'Starboard' },
+    ],
+    BoatClassCode: ['Motor Yachts', 'Pilothouse'],
+    // Plain text: the listing page renders this field stripped of HTML.
+    GeneralBoatDescription:
+      'Delivered in 2012, this 29 m (97 ft) raised-pilothouse motor yacht was built by the Italian shipyard Maiora Design & Construction, with styling by Francesco Paszkowski Design and Roberto Del Re. She is built around a planing GRP hull and superstructure, with an internal volume of 97 GT. Launched in August 2012, she undertook sea trials over the following months. Accommodation — 10 guests in 4 cabins: a primary suite with a queen-size bed and en-suite bathroom, a VIP cabin with a double bed and en-suite bathroom, and 2 twin cabins, each with a pullman berth and en-suite bathroom. Crew quarters for 3 in 2 crew cabins. Machinery — 2 × MTU 12V 2000 M94, 1,950 hp each, straight shaft drive · Top speed 25 kn · Fuel 1,849 gal in 4 aluminium tanks · Fresh water 660 gal. Amenities — Air conditioning · Stabilizers at anchor · TV in the saloon, in all cabins and outdoors · Indoor and outdoor audio systems · Sun pads and sun loungers · Swim platform · Light fishing gear. Particulars given in good faith but not guaranteed.',
+    Images: imgs('maiora-97', 120, "2012 Maiora 97' Raised Pilothouse"),
   },
 ];
 
