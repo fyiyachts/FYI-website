@@ -22,12 +22,16 @@ const OFFICE = {
   Country: 'US', Email: 'sales@fyiyachts.com', Phone: '305-854-6020',
 };
 
-const imgs = (slug: string, count: number, caption: string) =>
-  Array.from({ length: count }, (_, i) => ({
+/** Photos <slug>-01…<slug>-NN, in order; `first` moves that photo number to the front (the main photo). */
+const imgs = (slug: string, count: number, caption: string, first?: number) => {
+  const order = Array.from({ length: count }, (_, i) => i + 1);
+  if (first && first >= 1 && first <= count) order.unshift(...order.splice(first - 1, 1));
+  return order.map((n, i) => ({
     Priority: String(i),
     Caption: caption,
-    Uri: `/listings/${slug}/${slug}-${String(i + 1).padStart(2, '0')}.webp`,
+    Uri: `/listings/${slug}/${slug}-${String(n).padStart(2, '0')}.webp`,
   }));
+};
 
 export const MANUAL_LISTINGS: Record<string, any>[] = [
   {
@@ -312,7 +316,8 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     // Plain text: the listing page renders this field stripped of HTML.
     GeneralBoatDescription:
       'The Custom Line Navetta 28 is a 28.31 m (92 ft 10 in) compact yet spacious tri-deck luxury motor yacht, designed by Zuccon International Project with naval architecture by the Ferretti Engineering Department. Built in 2015, this example has had over a million dollars spent on her 2026 refit and is available for viewings. She carries the space and feel of a superyacht, remarkable for a yacht built below the 24 m load-line length and therefore not subject to full class regulations. Twin 1,200 hp MAN diesels, perfectly maintained, give her a top speed of 14 knots and a maximum range of 1,400 nm at 10 knots. Design — The Navetta 28 is recognizable from her unmistakable exterior profile and the panoramic upper-deck dining area, whose round glass sliding doors make the space remarkably flexible. The sundeck has a large sunbathing area and awning. On the main deck a continuous window runs from stern to bow, and below deck four hull windows at the level of the guest cabins — a first on the market — have “invisible” portholes bonded to the glass. At the stern, the Dual Mode Transom (DMT), a Ferretti Group patent, combines a floodable garage, a diving platform and a spacious beach club, the largest ever on a yacht of this size. Accommodation — 11 guests in 5 en-suite cabins: the owner’s master stateroom on the main deck, forward, with a large bathroom and walk-in wardrobe, and 4 guest cabins below — 3 with double beds and a twin cabin with a Pullman berth. 5 crew in 3 cabins with separate access. Inside — The salon opens as a large, carefully structured open space with the galley to starboard. Equipment — State-of-the-art A/V entertainment system · Zero-speed stabilizers (underway and at anchor). Particulars given in good faith but not guaranteed.',
-    Images: imgs('navetta-28', 118, '2015 Custom Line Navetta 28'),
+    // Main photo: YachtWay's #4, the profile view (client, 2026-11-19); the rest in YachtWay's order.
+    Images: imgs('navetta-28', 118, '2015 Custom Line Navetta 28', 4),
   },
 ];
 
