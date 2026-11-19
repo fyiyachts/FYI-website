@@ -169,6 +169,35 @@ function bgResizeUrl(src: string, w: number): string | null {
   return u.toString();
 }
 
+/** Hosts Vercel's image optimizer may fetch directly (vercel.json remotePatterns). */
+const OPTIMIZER_HOSTS = new Set([
+  new URL(SITE).hostname, 's3.amazonaws.com', 'cdn.yachtbroker.org', 'storage.googleapis.com',
+]);
+
+/**
+ * The photo for link previews (og:image): 1200px wide, served from this
+ * domain by the image optimizer.
+ *
+ * The feed's original is not usable there. It runs to several megabytes
+ * (api/img.ts measured one at 5.8 MiB / 8064px) and the photo host labels
+ * many of them application/octet-stream; WhatsApp and iMessage then show the
+ * link with no picture. The optimizer answers a crawler with a JPEG of
+ * 100–250 KB (checked 2026-11-18 with the WhatsApp and iMessage user agents).
+ * BoatsGroup photos are fetched already resized, through /api/img, so a first
+ * share does not wait on the full-size original. Any other host the optimizer
+ * cannot fetch keeps its own URL.
+ */
+function shareImageUrl(src: string): string {
+  let host: string;
+  try { host = new URL(src).hostname; } catch { return src; }
+  const resized = bgResizeUrl(src, 1200);
+  const fetchable = resized ? `${SITE}/api/img?u=${encodeURIComponent(resized)}`
+    : host === 'imt.boatwizard.com' ? `${SITE}/api/img?u=${encodeURIComponent(src)}`
+    : OPTIMIZER_HOSTS.has(host) ? src
+    : null;
+  return fetchable ? `${SITE}/_vercel/image?url=${encodeURIComponent(fetchable)}&w=1200&q=75` : src;
+}
+
 function bgHeroPreload(src: string): string {
   const href = bgResizeUrl(src, 1280);
   if (!href) return '';
@@ -226,7 +255,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Absolute, not root-relative: this is an og:image, and the crawlers that
     // read it have no page origin to resolve against.
-    const hero = seo.images[0]?.url || `${SITE}/brand/fyi-logo-2024.png`;
+    const hero = seo.images[0] ? shareImageUrl(seo.images[0].url) : `${SITE}/brand/fyi-logo-2024.png`;
     // Preload the hero photo the page will paint first — the same URLs the
     // React page requests (HERO_WIDTHS / HERO_SIZES in PublicListingPage.tsx
     // and bgResize in utils/img.ts; keep the three in step).
@@ -260,7 +289,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `<meta property="og:description" content="${esc(seo.metaDescription)}" />`,
       `<meta property="og:url" content="${esc(canonical)}" />`,
       `<meta property="og:image" content="${esc(hero)}" />`,
+      `<meta property="og:image:alt" content="${esc(seo.h1)}" />`,
       `<meta name="twitter:card" content="summary_large_image" />`,
+      `<meta name="twitter:image" content="${esc(hero)}" />`,
       ...(heroPreload ? [heroPreload] : []),
       ...jsonLd.map(ldScript),
     ].join('\n    ');
