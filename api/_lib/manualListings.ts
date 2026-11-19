@@ -1,7 +1,8 @@
 // Hand-entered sale listings that are NOT in FYI's BoatsGroup feed (client,
 // 2026-10-01 — central-agency boats FYI is marketing from the brokers' own
 // brochures; ANIM and the Alium 42 added 2026-10-28; the Maiora 97 on
-// 2026-11-19, from FYI's own YachtWay listing while BoatWizard is unavailable). Each record is shaped like a raw boats.com feed item so
+// 2026-11-19 and the Navetta 28 the same day, from FYI's own YachtWay listings
+// while BoatWizard is unavailable). Each record is shaped like a raw boats.com feed item so
 // every consumer that already parses the feed (the /api/yachts/proxy grids,
 // search, the listing page, /api/listing's server render) handles it with no
 // extra code. DocumentIDs sit in the 99,000,000 range, far above anything
@@ -21,12 +22,16 @@ const OFFICE = {
   Country: 'US', Email: 'sales@fyiyachts.com', Phone: '305-854-6020',
 };
 
-const imgs = (slug: string, count: number, caption: string) =>
-  Array.from({ length: count }, (_, i) => ({
+/** Photos <slug>-01…<slug>-NN, in order; `first` moves that photo number to the front (the main photo). */
+const imgs = (slug: string, count: number, caption: string, first?: number) => {
+  const order = Array.from({ length: count }, (_, i) => i + 1);
+  if (first && first >= 1 && first <= count) order.unshift(...order.splice(first - 1, 1));
+  return order.map((n, i) => ({
     Priority: String(i),
     Caption: caption,
-    Uri: `/listings/${slug}/${slug}-${String(i + 1).padStart(2, '0')}.webp`,
+    Uri: `/listings/${slug}/${slug}-${String(n).padStart(2, '0')}.webp`,
   }));
+};
 
 export const MANUAL_LISTINGS: Record<string, any>[] = [
   {
@@ -257,6 +262,62 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     GeneralBoatDescription:
       'Delivered in 2012, this 29 m (97 ft) raised-pilothouse motor yacht was built by the Italian shipyard Maiora Design & Construction, with styling by Francesco Paszkowski Design and Roberto Del Re. She is built around a planing GRP hull and superstructure, with an internal volume of 97 GT. Launched in August 2012, she undertook sea trials over the following months. Accommodation — 10 guests in 4 cabins: a primary suite with a queen-size bed and en-suite bathroom, a VIP cabin with a double bed and en-suite bathroom, and 2 twin cabins, each with a pullman berth and en-suite bathroom. Crew quarters for 3 in 2 crew cabins. Machinery — 2 × MTU 12V 2000 M94, 1,950 hp each, straight shaft drive · Top speed 25 kn · Fuel 1,849 gal in 4 aluminium tanks · Fresh water 660 gal. Amenities — Air conditioning · Stabilizers at anchor · TV in the saloon, in all cabins and outdoors · Indoor and outdoor audio systems · Sun pads and sun loungers · Swim platform · Light fishing gear. Particulars given in good faith but not guaranteed.',
     Images: imgs('maiora-97', 120, "2012 Maiora 97' Raised Pilothouse"),
+  },
+  {
+    // Source: FYI's own YachtWay listing (client, 2026-11-19, same rules as
+    // the Maiora 97): https://yachtway.com/brands/custom-line-yachts-for-sale/
+    // navetta-28/2015-navetta-28-c4bzwnnh/ — all 118 gallery photos, in
+    // YachtWay's order. Guests 11, as its description says (its spec box says
+    // 25). Its hull number is a placeholder and is not used.
+    Source: 'FYI-MANUAL',
+    DocumentID: '99000006',
+    SalesStatus: 'Active',
+    CompanyName: 'FYI Yachts',
+    Office: OFFICE,
+    LastModificationDate: '2026-11-19',
+    ItemReceivedDate: '2026-11-19',
+    Price: '4400000 USD',
+    NormPrice: 4400000,
+    PriceHideInd: false,
+    BoatLocation: { BoatCityName: 'Miami', BoatStateCode: 'FL', BoatCountryID: 'US' },
+    MakeString: 'Custom Line',
+    ModelYear: 2015,
+    SaleClassCode: 'Used',
+    Model: 'Navetta 28',
+    BoatCategoryCode: 'Power',
+    BuilderName: 'Ferretti Group',
+    DesignerName: 'Zuccon International Project',
+    CruisingSpeedMeasure: '10 kn',
+    MaximumSpeedMeasure: '14 kn',
+    RangeMeasure: '1400 nmi',
+    BeamMeasure: '23 ft',
+    MaxDraft: '7.25 ft',
+    LengthAtWaterLine: '70.87 ft',
+    DryWeightMeasure: '197,313 lb',
+    FuelTankCapacityMeasure: '3302|gallon',
+    FuelTankCountNumeric: 4,
+    FuelTankMaterialCode: 'Aluminum',
+    WaterTankCapacityMeasure: '528|gallon',
+    NumberOfEngines: 2,
+    TotalEnginePowerQuantity: '2,400 hp',
+    DriveTypeCode: 'Shaft Drive',
+    BoatHullMaterialCode: 'Fiberglass',
+    CabinsCountNumeric: 5,
+    HeadsCountNumeric: 6, // 5 en-suite + a day head (YachtWay: 5.5)
+    BerthsCountNumeric: 10,
+    MaximumNumberOfPassengersNumeric: 11,
+    NominalLength: '92.88 ft',
+    LengthOverall: '92.88 ft',
+    Engines: [
+      { Make: 'MAN', Model: 'V8-1200', Fuel: 'diesel', EnginePower: '1200|horsepower', Type: 'Inboard', Hours: 3000, BoatEngineLocationCode: 'Port' },
+      { Make: 'MAN', Model: 'V8-1200', Fuel: 'diesel', EnginePower: '1200|horsepower', Type: 'Inboard', Hours: 3000, BoatEngineLocationCode: 'Starboard' },
+    ],
+    BoatClassCode: ['Motor Yachts', 'Mega Yachts'],
+    // Plain text: the listing page renders this field stripped of HTML.
+    GeneralBoatDescription:
+      'The Custom Line Navetta 28 is a 28.31 m (92 ft 10 in) compact yet spacious tri-deck luxury motor yacht, designed by Zuccon International Project with naval architecture by the Ferretti Engineering Department. Built in 2015, this example has had over a million dollars spent on her 2026 refit and is available for viewings. She carries the space and feel of a superyacht, remarkable for a yacht built below the 24 m load-line length and therefore not subject to full class regulations. Twin 1,200 hp MAN diesels, perfectly maintained, give her a top speed of 14 knots and a maximum range of 1,400 nm at 10 knots. Design — The Navetta 28 is recognizable from her unmistakable exterior profile and the panoramic upper-deck dining area, whose round glass sliding doors make the space remarkably flexible. The sundeck has a large sunbathing area and awning. On the main deck a continuous window runs from stern to bow, and below deck four hull windows at the level of the guest cabins — a first on the market — have “invisible” portholes bonded to the glass. At the stern, the Dual Mode Transom (DMT), a Ferretti Group patent, combines a floodable garage, a diving platform and a spacious beach club, the largest ever on a yacht of this size. Accommodation — 11 guests in 5 en-suite cabins: the owner’s master stateroom on the main deck, forward, with a large bathroom and walk-in wardrobe, and 4 guest cabins below — 3 with double beds and a twin cabin with a Pullman berth. 5 crew in 3 cabins with separate access. Inside — The salon opens as a large, carefully structured open space with the galley to starboard. Equipment — State-of-the-art A/V entertainment system · Zero-speed stabilizers (underway and at anchor). Particulars given in good faith but not guaranteed.',
+    // Main photo: YachtWay's #4, the profile view (client, 2026-11-19); the rest in YachtWay's order.
+    Images: imgs('navetta-28', 118, '2015 Custom Line Navetta 28', 4),
   },
 ];
 
