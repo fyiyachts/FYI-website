@@ -23,15 +23,15 @@ const OFFICE = {
 };
 
 /**
- * Photos <slug>-01…<slug>-NN, in order; `first` moves that photo number to the
- * front (the main photo). `replaced` lists photo numbers swapped for a new
+ * Photos <slug>-01…<slug>-NN, in order; `first` moves that photo number (or
+ * those numbers, in that order) to the front — the first is the main photo. `replaced` lists photo numbers swapped for a new
  * version, saved as <slug>-NN-v2.webp: a new name, so no cached copy of the old
  * photo (browser, CDN or the image optimizer's day-long cache) can show.
  * `removed` lists photo numbers taken off the listing (their files deleted).
  */
-const imgs = (slug: string, count: number, caption: string, first?: number, replaced: number[] = [], removed: number[] = []) => {
-  const order = Array.from({ length: count }, (_, i) => i + 1);
-  if (first && first >= 1 && first <= count) order.unshift(...order.splice(first - 1, 1));
+const imgs = (slug: string, count: number, caption: string, first?: number | number[], replaced: number[] = [], removed: number[] = []) => {
+  const lead = (Array.isArray(first) ? first : first ? [first] : []).filter((n) => n >= 1 && n <= count);
+  const order = [...lead, ...Array.from({ length: count }, (_, i) => i + 1).filter((n) => !lead.includes(n))];
   return order.filter((n) => !removed.includes(n)).map((n, i) => ({
     Priority: String(i),
     Caption: caption,
@@ -326,7 +326,9 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     // #4, #5, #22, #24 and #33 replaced with the client's versions without the
     // boat's name (2026-11-20). Removed by the client the same day (site gallery
     // positions 2, 3, 6, 7, 30, 32): YachtWay's #1, #2, #6, #7, #30, #32.
-    Images: imgs('navetta-28', 118, '2015 Custom Line Navetta 28', 4, [4, 5, 22, 24, 33], [1, 2, 6, 7, 30, 32]),
+    // Main photo since 2026-11-20: YachtWay's #10, the side profile at anchor
+    // (the client's gallery position 6); the earlier main photo, #4, second.
+    Images: imgs('navetta-28', 118, '2015 Custom Line Navetta 28', [10, 4], [4, 5, 22, 24, 33], [1, 2, 6, 7, 30, 32]),
   },
 ];
 
