@@ -3,6 +3,8 @@
 // Two kinds, both keyed by DocumentID:
 //   • HIDDEN_PHOTOS — photos the site doesn't show (they stay in BoatWizard).
 //   • PRICES — a new asking price, shown with a "Price Reduced" from the old one.
+//   • SOLD — shown as sold: "Sold" wherever a price would be, no price
+//     anywhere (stripped from the data), still listed where it was.
 //   • PHOTO_SETS — the client's own photos in place of the feed's, after the
 //     feed's first few, in an order that is one list to edit.
 // Both retire themselves: a hidden photo no longer in the feed matches
@@ -91,9 +93,22 @@ const PHOTO_SETS: Record<string, PhotoSet> = {
   },
 };
 
+/* ------------------------------------------------ sold */
+
+/**
+ * DocumentID → day marked sold. The boat stays listed (same page, same place
+ * in the inventory: the default sort is by length); its price is removed from
+ * the data and every price display shows "Sold" (api/_lib/price.ts). Retires
+ * itself never — delete the entry when the feed marks the boat sold or it
+ * leaves the feed.
+ */
+const SOLD: Record<string, string> = {
+  '10354443': '2026-11-20', // 2021 OKEAN 80, Athens (client, 2026-11-20)
+};
+
 /* ------------------------------------------------ applying */
 
-const OVERRIDDEN_IDS = [...new Set([...Object.keys(HIDDEN_PHOTOS), ...Object.keys(PRICES), ...Object.keys(PHOTO_SETS)])];
+const OVERRIDDEN_IDS = [...new Set([...Object.keys(HIDDEN_PHOTOS), ...Object.keys(PRICES), ...Object.keys(PHOTO_SETS), ...Object.keys(SOLD)])];
 
 const fileName = (url: string): string => url.split(/[?#]/)[0].split('/').pop() || '';
 
@@ -135,6 +150,14 @@ export function applyListingOverrides<T extends Record<string, any>>(item: T): T
     ].map((img: Record<string, any>, i: number) => ({ ...img, Priority: String(i) }));
   }
 
+  if (SOLD[id]) {
+    // No price anywhere: not displayed, and not in the data either.
+    row.FyiSold = true;
+    row.PriceHideInd = true;
+    for (const k of ['Price', 'NormPrice', 'OriginalPrice', 'SavingsPrice', 'PriceQualifier']) delete row[k];
+    return item;
+  }
+
   const p = PRICES[id];
   if (p && !row.PriceHideInd && feedShowsOldPrice(row, p)) {
     row.Price = `${p.price.toFixed(2)} USD`;
@@ -163,6 +186,7 @@ export function applyListingOverridesInBody(body: string): string {
 export function manualReductions(): Record<string, Reduction> {
   const out: Record<string, Reduction> = {};
   for (const [id, p] of Object.entries(PRICES)) {
+    if (SOLD[id]) continue;
     if (p.was <= p.price) continue;
     out[id] = {
       previous: p.was,

@@ -265,13 +265,13 @@ export function ContactButtons({ context }: { context: string }) {
 
 // Mobile-only bottom bar: price always visible, one tap to inquire or call
 // (mobile-first, per the meeting's sticky-sidebar note).
-export function StickyMobileCta({ price, context }: { price: string; context: string }) {
+export function StickyMobileCta({ price, context, label = 'Asking' }: { price: string; context: string; label?: string }) {
   // Lifts the Brianna launcher clear of this bar (see useStickyCtaFlag).
   useStickyCtaFlag();
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-white/10 bg-yacht-900/95 px-4 py-3 backdrop-blur-md lg:hidden">
       <div className="min-w-0">
-        <p className="text-[9px] font-semibold uppercase tracking-[0.25em] text-white/45">Asking</p>
+        <p className="text-[9px] font-semibold uppercase tracking-[0.25em] text-white/45">{label}</p>
         <p className="truncate text-base font-light tracking-wide text-white">{price}</p>
       </div>
       <div className="flex flex-none items-center gap-2">

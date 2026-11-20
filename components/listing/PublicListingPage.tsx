@@ -16,7 +16,7 @@ import { track } from '../../utils/analytics';
 import { trackMetaViewContent } from '../../utils/metaPixel';
 import { optImg, srcSet } from '../../utils/img';
 import { countryName } from '../../api/_lib/countryName';
-import { formatMoney, listPrice, usdEquivalent, type Money } from '../../api/_lib/price';
+import { formatMoney, isSoldMoney, listPrice, usdEquivalent, type Money } from '../../api/_lib/price';
 import { buildListingContent, type ListingContent } from '../../api/_lib/listingContent';
 import { buildListingSeo, listingJsonLd } from '../../api/_lib/listingSeo';
 import { fetchJsonShared } from '../../utils/sharedFetch';
@@ -519,7 +519,8 @@ export default function PublicListingPage() {
           {/* City-level location map — never an exact berth */}
           <LocationMap location={boat.location} />
 
-          {/* Buyer tools (FYI meeting 2026-07-17): financing + insurance */}
+          {/* Buyer tools (FYI meeting 2026-07-17): financing + insurance. Not for a sold boat. */}
+          {!isSoldMoney(boat.listPrice) && (
           <div className="mt-12 grid gap-6 sm:grid-cols-2">
             <FinanceCalculator price={boat.price} tone="light" />
             <InsuranceQuoteCta
@@ -535,6 +536,7 @@ export default function PublicListingPage() {
               }}
             />
           </div>
+          )}
 
           <MoreLikeThis id={boat.id} make={boat.make} lengthFt={boat.lengthFt} />
           <RecentlySoldStrip id={boat.id} make={boat.make} lengthFt={boat.lengthFt} />
@@ -564,6 +566,12 @@ export default function PublicListingPage() {
               {[boat.make ? boat.make.toUpperCase() : null, metric].filter(Boolean).join(' · ')}
               {boat.location ? ` · ${boat.location}` : ''}
             </p>
+            {isSoldMoney(boat.listPrice) ? (
+              // Marked sold on the site (api/_lib/listingOverrides.ts): no price anywhere.
+              <p className="mt-5 border-t border-yacht-900/10 pt-5">
+                <span className="bg-yacht-brand px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-white">Sold</span>
+              </p>
+            ) : (
             <p className="mt-5 border-t border-yacht-900/10 pt-5 text-[14px] font-light text-yacht-900/60">
               Asking Price:{' '}
               {reduction && (
@@ -571,6 +579,7 @@ export default function PublicListingPage() {
               )}
               <span className="text-xl font-semibold tracking-wide text-yacht-900">{askingPrice(boat)}</span>
             </p>
+            )}
             {/* Shown for 90 days after a recorded drop (daily price snapshot); never with a hidden price. */}
             {reduction && (
               <p className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] font-light text-yacht-900/60">
@@ -614,7 +623,7 @@ export default function PublicListingPage() {
 
       <HomeFooter />
       <div className="h-16 lg:hidden" />
-      <StickyMobileCta price={askingPrice(boat)} context={boat.title} />
+      <StickyMobileCta price={askingPrice(boat)} label={isSoldMoney(boat.listPrice) ? 'Status' : undefined} context={boat.title} />
       <BriannaWidget />
 
       {lightbox !== null && (

@@ -12,7 +12,7 @@
 // (components/listing/specFields.ts re-exports it), so crawlers and visitors
 // read the same table. Dependency-free apart from the price / country helpers.
 
-import { formatMoney, listPrice, priceCurrency } from './price.js';
+import { formatMoney, isSoldMoney, listPrice, priceCurrency } from './price.js';
 import { countryName } from './countryName.js';
 
 export type SpecGroup =
@@ -187,8 +187,10 @@ export function listingLocation(it: Record<string, any>): string | undefined {
   return join([city, text(loc.BoatStateCode) || text(countryName(loc.BoatCountryID))], ', ');
 }
 
-function askingPrice(it: Record<string, any>, ctx: SpecContext): Out {
+function askingPrice(it: Record<string, any>, ctx: SpecContext): Out | SpecRow[] {
   const price = listPrice(it);
+  // Marked sold on the site (api/_lib/listingOverrides.ts): no "Asking Price" row at all.
+  if (isSoldMoney(price)) return [{ label: 'Status', value: 'Sold' }];
   if (!price) return 'Price on request';
   const notes: string[] = [];
   const qualifier = text(it.PriceQualifier);

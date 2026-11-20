@@ -31,7 +31,7 @@ import {
   compareSold, soldWindowStart,
   type BrandPage, type CategoryPage, type PublicBoat,
 } from './publicData';
-import { formatMoney } from '../../api/_lib/price';
+import { formatMoney, isSoldMoney } from '../../api/_lib/price';
 import { fmtDate } from '../../api/_lib/specFields';
 import { reductionFor, useReducedPrices, type ReducedMap } from '../../utils/useReducedPrices';
 
@@ -168,6 +168,8 @@ function BoatCard({ boat, priority = false, reduced }: { boat: PublicBoat; prior
   // Co-brokerage boats (BoatsGroup PLS) have full /listing/:id pages too.
   const external = boat.source && boat.source !== 'fyi' && boat.source !== 'cobrokerage';
   const badge = boat.source === 'fyi' ? 'FYI Exclusive' : null;
+  // Marked sold on the site (api/_lib/listingOverrides.ts): still listed, no price.
+  const sold = isSoldMoney(boat.listPrice);
   const href = boat.externalUrl
     ?? (external
       ? `/contact?vessel=${encodeURIComponent([boat.year, boat.make, boat.model].filter(Boolean).join(' '))}`
@@ -193,7 +195,7 @@ function BoatCard({ boat, priority = false, reduced }: { boat: PublicBoat; prior
           ) : (
             <div className="flex h-full items-center justify-center"><Anchor className="h-8 w-8 text-yacht-900/20" /></div>
           )}
-          {badge || reduction ? (
+          {badge || reduction || sold ? (
             <span className="absolute bottom-3 left-4 flex flex-wrap gap-1.5">
               {badge ? (
                 <span className={`px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] backdrop-blur-sm ${boat.source === 'fyi' ? 'bg-yacht-brand text-white' : 'bg-white/90 text-yacht-900'}`}>
@@ -203,6 +205,11 @@ function BoatCard({ boat, priority = false, reduced }: { boat: PublicBoat; prior
               {reduction ? (
                 <span className="bg-yacht-900/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
                   Price Reduced
+                </span>
+              ) : null}
+              {sold ? (
+                <span className="bg-yacht-900/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
+                  Sold
                 </span>
               ) : null}
             </span>
