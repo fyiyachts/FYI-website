@@ -2,7 +2,7 @@
 // the server render (api/listing.ts) and the React page, so the two never
 // disagree about what a listing is called.
 
-import { formatMoney, listPrice } from './price.js';
+import { formatMoney, isSoldMoney, listPrice } from './price.js';
 import { listingLocation, measure, fmtNum } from './specFields.js';
 import type { ListingContent } from './listingContent.js';
 
@@ -62,7 +62,8 @@ export function buildListingSeo(it: Record<string, any>, content: ListingContent
     ymm,
     lengthFt ? `${fmtNum(lengthFt, 0)} ft` : '',
     boatName ? `“${boatName}”` : '',
-    location ? `for Sale in ${location}` : 'for Sale',
+    // A boat marked sold on the site (api/_lib/listingOverrides.ts) is never "for Sale".
+    it.FyiSold === true ? (location ? `Sold · ${location}` : 'Sold') : location ? `for Sale in ${location}` : 'for Sale',
     '| FYI Yachts',
   ].filter(Boolean).join(' ');
 
@@ -87,8 +88,10 @@ export function buildListingSeo(it: Record<string, any>, content: ListingContent
  * schema.org, and not an "invalid Product" in Search Console.
  */
 export function listingJsonLd(it: Record<string, any>, content: ListingContent, seo: ListingSeo, canonical: string): Record<string, unknown> {
-  const price = listPrice(it);
-  const sold = /sold/i.test(String(it.SalesStatus ?? ''));
+  const listed = listPrice(it);
+  // "Sold" (no price) for a boat marked sold on the site: no offer, no number.
+  const price = listed && !isSoldMoney(listed) ? listed : undefined;
+  const sold = /sold/i.test(String(it.SalesStatus ?? '')) || it.FyiSold === true;
   const year = measure(it.ModelYear)?.n;
   return {
     '@context': 'https://schema.org',

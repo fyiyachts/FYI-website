@@ -11,6 +11,14 @@
 
 export interface Money { amount: number; currency: string }
 
+/**
+ * A boat marked sold on the site (api/_lib/listingOverrides.ts, `FyiSold`)
+ * has this as its price: formatMoney prints "Sold", it never matches a price
+ * reduction (different currency), and there is no number to leak.
+ */
+export const SOLD_CURRENCY = 'SOLD';
+export const isSoldMoney = (m: Money | undefined | null): boolean => m?.currency === SOLD_CURRENCY;
+
 const num = (v: unknown): number | undefined => {
   if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : undefined;
   if (typeof v !== 'string') return undefined;
@@ -32,6 +40,7 @@ export function usdEquivalent(it: Record<string, any>): number | undefined {
 
 /** The asking price to show, in the record's own currency; undefined when hidden or absent. */
 export function listPrice(it: Record<string, any>): Money | undefined {
+  if (it.FyiSold === true) return { amount: 0, currency: SOLD_CURRENCY };
   if (it.PriceHideInd) return undefined;
   const currency = priceCurrency(it.Price);
   if (currency !== 'USD') {
@@ -44,6 +53,7 @@ export function listPrice(it: Record<string, any>): Money | undefined {
 
 /** "$7,900,000", "€845,000"; `fallback` when there is no price to show. */
 export function formatMoney(m: Money | undefined | null, fallback = 'Price on request'): string {
+  if (isSoldMoney(m)) return 'Sold';
   if (!m || !Number.isFinite(m.amount) || m.amount <= 0) return fallback;
   try {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: m.currency, maximumFractionDigits: 0 }).format(m.amount);
