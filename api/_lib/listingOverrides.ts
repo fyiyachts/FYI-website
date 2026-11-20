@@ -60,6 +60,9 @@ const PRICES: Record<string, PriceOverride> = {
   // 2012 Azimut 105 "SALE VITA": the two deliberate listings of the same boat (client, 2026-11-20).
   '10277901': { price: 4_999_500, was: 5_275_000, since: '2026-11-20' }, // 2012 Azimut 105
   '10391316': { price: 4_999_500, was: 5_275_000, since: '2026-11-20' }, // 2012 Azimut Grande 32M
+  // Hand-entered listing (api/_lib/manualListings.ts): its own Price is already
+  // $4,495,000, so only the reduction from $4,500,000 comes from here.
+  '99000006': { price: 4_495_000, was: 4_500_000, since: '2026-11-20' }, // 2015 Custom Line Navetta 28
 };
 
 /* ------------------------------------------------ replacement photo sets */
