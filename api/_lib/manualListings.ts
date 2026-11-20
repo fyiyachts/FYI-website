@@ -235,7 +235,7 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     PriceHideInd: false,
     BoatLocation: { BoatCityName: 'Aventura', BoatStateCode: 'FL', BoatCountryID: 'US' },
     MakeString: 'Maiora',
-    ModelYear: 2012,
+    ModelYear: 2013, // client, 2026-11-20 (YachtWay says 2012)
     SaleClassCode: 'Used',
     Model: "97' Raised Pilothouse",
     BoatCategoryCode: 'Power',
@@ -266,8 +266,8 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     BoatClassCode: ['Motor Yachts', 'Pilothouse'],
     // Plain text: the listing page renders this field stripped of HTML.
     GeneralBoatDescription:
-      'Delivered in 2012, this 29 m (97 ft) raised-pilothouse motor yacht was built by the Italian shipyard Maiora Design & Construction, with styling by Francesco Paszkowski Design and Roberto Del Re. She is built around a planing GRP hull and superstructure, with an internal volume of 97 GT. Launched in August 2012, she undertook sea trials over the following months. Accommodation — 10 guests in 4 cabins: a primary suite with a queen-size bed and en-suite bathroom, a VIP cabin with a double bed and en-suite bathroom, and 2 twin cabins, each with a pullman berth and en-suite bathroom. Crew quarters for 3 in 2 crew cabins. Machinery — 2 × MTU 12V 2000 M94, 1,950 hp each, straight shaft drive · Top speed 25 kn · Fuel 1,849 gal in 4 aluminium tanks · Fresh water 660 gal. Amenities — Air conditioning · Stabilizers at anchor · TV in the saloon, in all cabins and outdoors · Indoor and outdoor audio systems · Sun pads and sun loungers · Swim platform · Light fishing gear. Particulars given in good faith but not guaranteed.',
-    Images: imgs('maiora-97', 120, "2012 Maiora 97' Raised Pilothouse"),
+      'Delivered in 2013, this 29 m (97 ft) raised-pilothouse motor yacht was built by the Italian shipyard Maiora Design & Construction, with styling by Francesco Paszkowski Design and Roberto Del Re. She is built around a planing GRP hull and superstructure, with an internal volume of 97 GT. Launched in August 2013, she undertook sea trials over the following months. Accommodation — 10 guests in 4 cabins: a primary suite with a queen-size bed and en-suite bathroom, a VIP cabin with a double bed and en-suite bathroom, and 2 twin cabins, each with a pullman berth and en-suite bathroom. Crew quarters for 3 in 2 crew cabins. Machinery — 2 × MTU 12V 2000 M94, 1,950 hp each, straight shaft drive · Top speed 25 kn · Fuel 1,849 gal in 4 aluminium tanks · Fresh water 660 gal. Amenities — Air conditioning · Stabilizers at anchor · TV in the saloon, in all cabins and outdoors · Indoor and outdoor audio systems · Sun pads and sun loungers · Swim platform · Light fishing gear. Particulars given in good faith but not guaranteed.',
+    Images: imgs('maiora-97', 120, "2013 Maiora 97' Raised Pilothouse"),
   },
   {
     // Source: FYI's own YachtWay listing (client, 2026-11-19, same rules as
