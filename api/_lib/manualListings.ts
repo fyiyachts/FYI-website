@@ -280,10 +280,12 @@ export const MANUAL_LISTINGS: Record<string, any>[] = [
     SalesStatus: 'Active',
     CompanyName: 'FYI Yachts',
     Office: OFFICE,
-    LastModificationDate: '2026-11-19',
+    LastModificationDate: '2026-11-20',
     ItemReceivedDate: '2026-11-19',
-    Price: '4400000 USD',
-    NormPrice: 4400000,
+    // $4,495,000, shown reduced from $4,500,000 (client, 2026-11-20): the
+    // reduction is in api/_lib/listingOverrides.ts (PRICES). YachtWay: $4,400,000.
+    Price: '4495000 USD',
+    NormPrice: 4495000,
     PriceHideInd: false,
     BoatLocation: { BoatCityName: 'Miami', BoatStateCode: 'FL', BoatCountryID: 'US' },
     MakeString: 'Custom Line',
