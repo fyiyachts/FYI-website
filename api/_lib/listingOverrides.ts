@@ -3,6 +3,8 @@
 // Two kinds, both keyed by DocumentID:
 //   • HIDDEN_PHOTOS — photos the site doesn't show (they stay in BoatWizard).
 //   • PRICES — a new asking price, shown with a "Price Reduced" from the old one.
+//   • REMOVED — taken off the site entirely (every feed reader drops it; its
+//     page shows "no longer available").
 //   • SOLD — shown as sold: "Sold" wherever a price would be, no price
 //     anywhere (stripped from the data), still listed where it was.
 //   • PHOTO_SETS — the client's own photos in place of the feed's, after the
@@ -93,6 +95,23 @@ const PHOTO_SETS: Record<string, PhotoSet> = {
   },
 };
 
+/* ------------------------------------------------ removed */
+
+/** DocumentID → day removed. Delete the entry to bring the listing back. */
+const REMOVED: Record<string, string> = {
+  // BoatWizard's copy of the 2012 Maiora 97, Aventura (client, 2026-11-20). The
+  // boat stays on the site as the hand-entered 99000005 (api/_lib/manualListings.ts).
+  '10333381': '2026-11-20',
+};
+
+/** True for a listing taken off the site. */
+export const isRemovedListing = (id: unknown): boolean => Object.prototype.hasOwnProperty.call(REMOVED, String(id ?? ''));
+
+/** The feed rows without the listings taken off the site. */
+export function dropRemovedListings<T extends Record<string, any>>(rows: T[]): T[] {
+  return rows.filter((r) => !isRemovedListing(r?.DocumentID));
+}
+
 /* ------------------------------------------------ sold */
 
 /**
@@ -108,7 +127,7 @@ const SOLD: Record<string, string> = {
 
 /* ------------------------------------------------ applying */
 
-const OVERRIDDEN_IDS = [...new Set([...Object.keys(HIDDEN_PHOTOS), ...Object.keys(PRICES), ...Object.keys(PHOTO_SETS), ...Object.keys(SOLD)])];
+const OVERRIDDEN_IDS = [...new Set([...Object.keys(HIDDEN_PHOTOS), ...Object.keys(PRICES), ...Object.keys(PHOTO_SETS), ...Object.keys(SOLD), ...Object.keys(REMOVED)])];
 
 const fileName = (url: string): string => url.split(/[?#]/)[0].split('/').pop() || '';
 
@@ -175,6 +194,9 @@ export function applyListingOverridesInBody(body: string): string {
   try {
     const data = JSON.parse(body);
     if (!Array.isArray(data?.results)) return body;
+    const kept = dropRemovedListings(data.results);
+    if (typeof data.numResults === 'number') data.numResults = Math.max(0, data.numResults - (data.results.length - kept.length));
+    data.results = kept;
     data.results.forEach(applyListingOverrides);
     return JSON.stringify(data);
   } catch {
@@ -186,7 +208,7 @@ export function applyListingOverridesInBody(body: string): string {
 export function manualReductions(): Record<string, Reduction> {
   const out: Record<string, Reduction> = {};
   for (const [id, p] of Object.entries(PRICES)) {
-    if (SOLD[id]) continue;
+    if (SOLD[id] || REMOVED[id]) continue;
     if (p.was <= p.price) continue;
     out[id] = {
       previous: p.was,

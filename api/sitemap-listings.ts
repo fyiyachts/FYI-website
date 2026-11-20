@@ -29,6 +29,7 @@ type VercelResponse = {
 
 import { MANUAL_LISTINGS } from './_lib/manualListings.js';
 import { plsConfigured, plsFetchAll, plsSearch } from './_lib/plsFeed.js';
+import { dropRemovedListings } from './_lib/listingOverrides.js';
 
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -91,7 +92,7 @@ async function fetchExclusives(): Promise<Record<string, any>[]> {
     if (!res.ok) throw new Error(`boats.com ${res.status}`);
     const body = (await res.json()) as { results?: Record<string, any>[]; numResults?: number };
     const rows = body.results ?? [];
-    all.push(...rows);
+    all.push(...dropRemovedListings(rows)); // never a listing taken off the site
     if (rows.length < ROWS_PER_PAGE || all.length >= Number(body.numResults ?? 0) + MANUAL_LISTINGS.length) break;
   }
   return all;

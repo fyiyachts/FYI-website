@@ -42,6 +42,7 @@ import { listPrice } from '../_lib/price.js';
 import {
   getAllPriceRecords, kv, kvConfigured, kvGetJson, kvPipeline, kvSetJson, type PriceRecord,
 } from '../_lib/priceHistory.js';
+import { dropRemovedListings } from '../_lib/listingOverrides.js';
 
 const SITE = (process.env.SITE_URL || 'https://fyiyachts.com').replace(/\/$/, '');
 const CRON_SECRET = process.env.CRON_SECRET || '';
@@ -75,7 +76,7 @@ async function fetchExclusives(): Promise<Record<string, any>[]> {
     const res = await fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(30_000) });
     if (!res.ok) throw new Error(`inventory feed HTTP ${res.status}`);
     const items = ((await res.json()) as { results?: Record<string, any>[] }).results ?? [];
-    out.push(...items);
+    out.push(...dropRemovedListings(items));
     if (items.length < 500) break;
   }
   return out;

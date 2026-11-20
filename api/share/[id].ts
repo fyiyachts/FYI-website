@@ -1,4 +1,4 @@
-import { applyListingOverrides } from '../_lib/listingOverrides.js';
+import { applyListingOverrides, isRemovedListing } from '../_lib/listingOverrides.js';
 
 // FYI's BoatsGroup (boats.com) inventory feed — same source as /api/yachts/proxy.
 const UPSTREAM = 'https://api.boats.com/inventory/search';
@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
 
     const data = await upstream.json();
     const items = data.results || data;
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0 || isRemovedListing(items[0]?.DocumentID)) {
       return res.status(404).json({ error: 'Yacht not found' });
     }
 
