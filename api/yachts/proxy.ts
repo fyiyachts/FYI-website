@@ -9,7 +9,7 @@ type VercelResponse = {
 
 import { findManualListing, manualListingsFor } from '../_lib/manualListings.js';
 import { plsConfigured, plsGetById } from '../_lib/plsFeed.js';
-import { applyListingOverrides, applyListingOverridesInBody } from '../_lib/listingOverrides.js';
+import { applyListingOverrides, applyListingOverridesInBody, isRemovedListing } from '../_lib/listingOverrides.js';
 import { attachListingVideos } from '../_lib/listingVideos.js';
 
 // BoatsGroup (boats.com) inventory feed. Key is a query param (no auth header).
@@ -338,7 +338,7 @@ async function listingLookup(res: VercelResponse, url: URL, timeoutMs: number, r
   // PLS). FYI's own version always wins: PLS is only asked when the
   // exclusives feed has no such DocumentID. A PLS failure is an error, not
   // "not found" — it used to be swallowed into an empty (cached) 200.
-  if (plsConfigured()) {
+  if (plsConfigured() && !isRemovedListing(id)) {
     try {
       const co = await withRetry(() => plsGetById(id), () => false, retry);
       if (co) {

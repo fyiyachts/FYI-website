@@ -21,7 +21,7 @@ import {
   getAllPriceRecords, kvConfigured, kvGetJson, kvSetJson, reductionOf, writePriceRecords,
   REDUCED_WINDOW_DAYS, type PriceRecord, type Reduction,
 } from '../_lib/priceHistory.js';
-import { applyListingOverrides, manualReductions } from '../_lib/listingOverrides.js';
+import { applyListingOverrides, dropRemovedListings, manualReductions } from '../_lib/listingOverrides.js';
 
 const UPSTREAM = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -67,7 +67,7 @@ async function fetchExclusives(): Promise<Record<string, any>[]> {
     const data = (await res.json()) as { results?: Record<string, any>[] };
     const items = Array.isArray(data.results) ? data.results : [];
     items.forEach(applyListingOverrides); // manual price fixes count as the real price
-    for (const it of items) {
+    for (const it of dropRemovedListings(items)) { // a listing taken off the site counts as gone
       const id = String(it.DocumentID || '');
       if (id && !seen.has(id)) { seen.add(id); out.push(it); }
     }

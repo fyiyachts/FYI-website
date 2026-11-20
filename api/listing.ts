@@ -19,7 +19,7 @@
 import { INDEX_SHELL } from './_lib/indexShell.js';
 import { findManualListing } from './_lib/manualListings.js';
 import { plsGetById } from './_lib/plsFeed.js';
-import { applyListingOverrides } from './_lib/listingOverrides.js';
+import { applyListingOverrides, isRemovedListing } from './_lib/listingOverrides.js';
 import { attachListingVideos, type ListingVideo } from './_lib/listingVideos.js';
 import { buildListingContent } from './_lib/listingContent.js';
 import { buildSpecGroups, fmtDate, type SpecGroupRows } from './_lib/specFields.js';
@@ -211,6 +211,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', CACHE_OK);
 
   if (!id) return notFound(res);
+  // Taken off the site (api/_lib/listingOverrides.ts): the same page as a boat that left the feed.
+  if (isRemovedListing(id)) return await gone(res, id);
 
   try {
     // Hand-entered listings (api/_lib/manualListings.ts) before the feed.

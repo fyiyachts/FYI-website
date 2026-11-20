@@ -14,6 +14,7 @@
  * FYI's inventory and their IDs live in a different namespace, so they go to
  * the inventory index rather than 404.
  */
+import { dropRemovedListings } from './_lib/listingOverrides.js';
 
 type VercelRequest = { query: Record<string, string | string[]>; method?: string };
 type VercelResponse = {
@@ -42,7 +43,7 @@ async function activeIds(): Promise<string[]> {
   const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`feed ${res.status}`);
   const data: any = await res.json();
-  const ids = (Array.isArray(data?.results) ? data.results : [])
+  const ids = dropRemovedListings(Array.isArray(data?.results) ? data.results : [])
     .map((it: any) => String(it?.DocumentID || ''))
     .filter(Boolean);
   idCache = { ids, at: Date.now() };

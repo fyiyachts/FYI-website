@@ -10,7 +10,7 @@ import { MANUAL_LISTINGS } from './manualListings.js';
 import { plsConfigured, plsSearch, PLS_CARD_FIELDS } from './plsFeed.js';
 import { formatMoney, listPrice } from './price.js';
 import { listingLocation } from './specFields.js';
-import { applyListingOverrides } from './listingOverrides.js';
+import { applyListingOverrides, dropRemovedListings } from './listingOverrides.js';
 
 const INVENTORY_URL = 'https://api.boats.com/inventory/search';
 const KEY = process.env.BOATS_API_KEY || '';
@@ -63,7 +63,7 @@ async function fyiActive(): Promise<Record<string, any>[]> {
     const res = await fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(6_000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data: any = await res.json();
-    const rows = (Array.isArray(data?.results) ? data.results : []).map((r: Record<string, any>) => ({
+    const rows = dropRemovedListings(Array.isArray(data?.results) ? data.results : []).map((r: Record<string, any>) => ({
       ...applyListingOverrides(r), Images: Array.isArray(r.Images) ? r.Images.slice(0, 1) : [],
     }));
     fyiCache = { rows: [...MANUAL_LISTINGS, ...rows], at: Date.now() };

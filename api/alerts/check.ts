@@ -1,6 +1,7 @@
 import { embedQuery, queryIndex, isPineconeConfigured } from '../_lib/pineconeCore.js';
 import { getTransporter, isEmailConfigured, getSmtpUser } from '../_lib/email.js';
 import { recordAlertSent } from '../_lib/supabaseUsers.js';
+import { isRemovedListing } from '../_lib/listingOverrides.js';
 
 const KV_URL = process.env.KV_REST_API_URL || '';
 const KV_TOKEN = process.env.KV_REST_API_TOKEN || '';
@@ -55,7 +56,7 @@ async function fetchBoatPrice(documentId: number): Promise<string | null> {
     if (!res.ok) return null;
     const data = await res.json();
     const items = data.results || data;
-    if (!Array.isArray(items) || items.length === 0) return null;
+    if (!Array.isArray(items) || items.length === 0 || isRemovedListing(documentId)) return null;
     const item = items[0];
     return item.Price || item.NormPrice || item.CurrentPrice || null;
   } catch { return null; }
