@@ -25,12 +25,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const wantCards = !!req.query?.cards;
+  // Includes hand-entered reductions (api/_lib/listingOverrides.ts) even without
+  // KV, so a preview deployment shows the same "was" prices as production.
+  const index = await getReducedIndex();
   if (!kvConfigured()) {
     return res.status(200).json(wantCards
-      ? { numResults: 0, results: [], reduced: {}, configured: false }
-      : { drops: [], reduced: {}, configured: false });
+      ? { numResults: 0, results: [], reduced: index.items, configured: false }
+      : { drops: [], reduced: index.items, configured: false });
   }
-  const index = await getReducedIndex();
   if (wantCards) {
     // Only boats still inside the window, hidden prices never.
     const results = (await getReducedCards()).filter((c) => index.items[String(c.DocumentID)] && !c.PriceHideInd);
