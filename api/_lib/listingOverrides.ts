@@ -55,6 +55,9 @@ interface PriceOverride {
 /** DocumentID → price override. USD listings only. */
 const PRICES: Record<string, PriceOverride> = {
   '10354522': { price: 2_595_000, was: 2_695_000, since: '2026-11-16' }, // 2020 Azimut S8
+  // 2012 Azimut 105 "SALE VITA": the two deliberate listings of the same boat (client, 2026-11-20).
+  '10277901': { price: 4_999_500, was: 5_275_000, since: '2026-11-20' }, // 2012 Azimut 105
+  '10391316': { price: 4_999_500, was: 5_275_000, since: '2026-11-20' }, // 2012 Azimut Grande 32M
 };
 
 /* ------------------------------------------------ applying */
