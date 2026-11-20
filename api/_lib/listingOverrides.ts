@@ -3,6 +3,8 @@
 // Two kinds, both keyed by DocumentID:
 //   • HIDDEN_PHOTOS — photos the site doesn't show (they stay in BoatWizard).
 //   • PRICES — a new asking price, shown with a "Price Reduced" from the old one.
+//   • PHOTO_SETS — the client's own photos in place of the feed's, after the
+//     feed's first few, in an order that is one list to edit.
 // Both retire themselves: a hidden photo no longer in the feed matches
 // nothing, and a price override only applies while the feed still shows the
 // old price — once BoatWizard is updated (to this price or any other), the
@@ -60,9 +62,35 @@ const PRICES: Record<string, PriceOverride> = {
   '10391316': { price: 4_999_500, was: 5_275_000, since: '2026-11-20' }, // 2012 Azimut Grande 32M
 };
 
+/* ------------------------------------------------ replacement photo sets */
+
+// The client's photos, shown after the feed's first `keepFirst` photos instead
+// of the rest of the feed's. Files live in public/listings/<dir>/ as
+// <prefix>-NN.webp, NN being the number the broker gave the photo, so `order`
+// is the broker's numbers in display order: to reorder the gallery, reorder
+// this list (add a number to show a new file, drop one to hide it).
+
+interface PhotoSet {
+  keepFirst: number;
+  dir: string;
+  prefix: string;
+  order: number[];
+}
+
+const PHOTO_SETS: Record<string, PhotoSet> = {
+  // 1988 Burger Classic Motoryacht "Victory" (client, 2026-11-20, "New Burger
+  // Pics" 1–26). 3 and 16 are byte-identical copies of 2 and 15, left out.
+  '10387454': {
+    keepFirst: 2,
+    dir: 'burger-victory',
+    prefix: 'victory',
+    order: [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26],
+  },
+};
+
 /* ------------------------------------------------ applying */
 
-const OVERRIDDEN_IDS = [...new Set([...Object.keys(HIDDEN_PHOTOS), ...Object.keys(PRICES)])];
+const OVERRIDDEN_IDS = [...new Set([...Object.keys(HIDDEN_PHOTOS), ...Object.keys(PRICES), ...Object.keys(PHOTO_SETS)])];
 
 const fileName = (url: string): string => url.split(/[?#]/)[0].split('/').pop() || '';
 
@@ -89,6 +117,19 @@ export function applyListingOverrides<T extends Record<string, any>>(item: T): T
   if (hidden && Array.isArray(row.Images)) {
     const set = new Set(hidden);
     row.Images = row.Images.filter((x: unknown) => !set.has(fileName(photoUrl(x))));
+  }
+
+  const set = PHOTO_SETS[id];
+  if (set && Array.isArray(row.Images)) {
+    const kept = row.Images.slice(0, set.keepFirst);
+    const caption = [row.ModelYear, row.MakeString, row.Model].filter(Boolean).join(' ');
+    row.Images = [
+      ...kept,
+      ...set.order.map((n) => ({
+        Caption: caption,
+        Uri: `/listings/${set.dir}/${set.prefix}-${String(n).padStart(2, '0')}.webp`,
+      })),
+    ].map((img: Record<string, any>, i: number) => ({ ...img, Priority: String(i) }));
   }
 
   const p = PRICES[id];
